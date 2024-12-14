@@ -1,20 +1,77 @@
-basePath: /api/v1
+basePath: /api
+definitions:
+  controllers.ErrorResponse:
+    properties:
+      error:
+        description: Поле с описанием ошибки
+        type: string
+    type: object
+  dto.RegisterUserDTO:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  models.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        type: string
+      username:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
-  /example/helloworld:
+  /helloworld:
     get:
       consumes:
       - application/json
-      description: do ping
+      description: A simple example endpoint that responds with the string "helloworld"
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: helloworld
           schema:
             type: string
-      summary: ping example
+      summary: Returns "helloworld"
       tags:
-      - example
+      - Example
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user by providing username, password, and email
+      parameters:
+      - description: User data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterUserDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Successfully created user
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Invalid input" // Указание структуры ошибки
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      summary: Register new user
+      tags:
+      - auth
 swagger: "2.0"
