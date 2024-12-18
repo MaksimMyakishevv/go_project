@@ -3,8 +3,22 @@ definitions:
   controllers.ErrorResponse:
     properties:
       error:
-        description: Поле с описанием ошибки
         type: string
+    type: object
+  controllers.TokenResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  dto.LoginDTO:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
     type: object
   dto.InputQuestionDTO:
     properties:
@@ -86,6 +100,37 @@ paths:
       summary: Returns "helloworld"
       tags:
       - Example
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login a user by providing email and password, and return a JWT
+        token
+      parameters:
+      - description: User login data
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT token
+          schema:
+            $ref: '#/definitions/controllers.TokenResponse'
+        "400":
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid credentials
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      summary: Login user and return JWT token
+      tags:
+      - auth
   /register:
     post:
       consumes:
@@ -106,7 +151,11 @@ paths:
           schema:
             $ref: '#/definitions/models.User'
         "400":
-          description: Invalid input" // Указание структуры ошибки
+          description: Invalid input
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+        "409":
+          description: Conflict - user already exists
           schema:
             $ref: '#/definitions/controllers.ErrorResponse'
       summary: Register new user
