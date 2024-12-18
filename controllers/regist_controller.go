@@ -15,8 +15,8 @@ type ErrorResponse struct {
 }
 
 // AuthController — контроллер для обработки запросов на регистрацию
-type AuthController struct {
-	Service *services.AuthService
+type RegistController struct {
+	Service *services.RegistService
 }
 
 // RegisterUser godoc
@@ -29,7 +29,7 @@ type AuthController struct {
 // @Success 201 {object} models.User "Successfully created user"
 // @Failure 400 {object} ErrorResponse "Invalid input" // Указание структуры ошибки
 // @Router /register [post]
-func (controller *AuthController) RegisterUser(c *gin.Context) {
+func (controller *RegistController) RegisterUser(c *gin.Context) {
 	var userDTO dto.RegisterUserDTO
 	if err := c.ShouldBindBodyWith(&userDTO, binding.JSON); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()}) // Использование структуры ошибки

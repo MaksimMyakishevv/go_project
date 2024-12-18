@@ -31,13 +31,13 @@ func main() {
 
 	database.InitDB()
 	// Инициализация сервиса
-	authService := &services.AuthService{
+	RegistService := &services.RegistService{
 		DB: database.GetDB(),
 	}
 
 	// Инициализация контроллера
-	authController := &controllers.AuthController{
-		Service: authService,
+	RegisController := &controllers.RegistController{
+		Service: RegistService,
 	}
 
 	r := gin.Default()
@@ -45,7 +45,7 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.GET("/helloworld", Helloworld)
-		v1.POST("/register", authController.RegisterUser)
+		v1.POST("/register", RegisController.RegisterUser)
 	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	r.Run(":8080")
