@@ -5,6 +5,7 @@ import (
 	"new/dto"
 	"new/models"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -24,13 +25,20 @@ func (service *RegistService) RegisterUser(userDTO dto.RegisterUserDTO) (*models
 		return nil, errors.New("email already taken")
 	}
 
-	// Создаем нового пользователя
+	// Хэшируем пароль перед сохранением
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userDTO.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	// Создаем нового пользователя с хэшированным паролем
 	newUser := models.User{
 		Username: userDTO.Username,
-		Password: userDTO.Password, // На практике пароли должны хешироваться
+		Password: string(hashedPassword), // Храним хэш пароля
 		Email:    userDTO.Email,
 	}
 
+	// Сохраняем нового пользователя в базу данных
 	if err := service.DB.Create(&newUser).Error; err != nil {
 		return nil, err
 	}

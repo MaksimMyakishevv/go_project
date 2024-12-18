@@ -28,26 +28,35 @@ func Helloworld(g *gin.Context) {
 
 func main() {
 	// Инициализация подключения к базе данных
-
 	database.InitDB()
-	// Инициализация сервиса
+
+	// Инициализация сервисов
 	RegistService := &services.RegistService{
+		DB: database.GetDB(),
+	}
+	AuthService := &services.AuthService{
 		DB: database.GetDB(),
 	}
 
 	// Инициализация контроллера
 	RegisController := &controllers.RegistController{
-		Service: RegistService,
+		Service_regist: RegistService,
+		Service_auth:   AuthService,
 	}
 
+	// Настройка маршрутов и Swagger документации
 	r := gin.Default()
 	docs.SwaggerInfo.BasePath = "/api"
 	v1 := r.Group("/api")
 	{
 		v1.GET("/helloworld", Helloworld)
 		v1.POST("/register", RegisController.RegisterUser)
+		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
 	}
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
-	r.Run(":8080")
 
+	// Маршрут для Swagger документации
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+
+	// Запуск сервера
+	r.Run(":8080")
 }
