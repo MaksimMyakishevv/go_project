@@ -3,10 +3,14 @@
     "info": {
         "contact": {}
     },
-    "basePath": "/api",
     "paths": {
         "/helloworld": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "A simple example endpoint that responds with the string \"helloworld\"",
                 "consumes": [
                     "application/json"
@@ -188,6 +192,13 @@
                     "type": "string"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

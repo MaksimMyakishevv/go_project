@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/helloworld": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "A simple example endpoint that responds with the string \"helloworld\"",
                 "consumes": [
                     "application/json"
@@ -199,6 +204,13 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
@@ -206,7 +218,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "",
 	Host:             "",
-	BasePath:         "/api",
+	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "",
 	Description:      "",

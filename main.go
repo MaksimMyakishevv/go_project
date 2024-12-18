@@ -5,6 +5,7 @@ import (
 	"new/controllers"
 	"new/database"
 	docs "new/docs"
+	middleware "new/midellware"
 	"new/services"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 // Helloworld godoc
 // @Summary Returns "helloworld"
@@ -21,9 +24,10 @@ import (
 // @Accept json
 // @Produce json
 // @Success 200 {string} string "helloworld"
+// @Security BearerAuth
 // @Router /helloworld [get]
-func Helloworld(g *gin.Context) {
-	g.JSON(http.StatusOK, "helloworld")
+func Helloworld(c *gin.Context) {
+	c.JSON(http.StatusOK, "helloworld")
 }
 
 func main() {
@@ -47,11 +51,19 @@ func main() {
 	// Настройка маршрутов и Swagger документации
 	r := gin.Default()
 	docs.SwaggerInfo.BasePath = "/api"
+
+	// Открытые маршруты
 	v1 := r.Group("/api")
 	{
-		v1.GET("/helloworld", Helloworld)
 		v1.POST("/register", RegisController.RegisterUser)
-		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
+		v1.POST("/login", RegisController.LoginUser)
+	}
+
+	// Защищённые маршруты
+	protected := v1.Group("/")
+	protected.Use(middleware.AuthMiddleware())
+	{
+		protected.GET("/helloworld", Helloworld)
 	}
 
 	// Маршрут для Swagger документации

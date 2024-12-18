@@ -1,4 +1,3 @@
-basePath: /api
 definitions:
   controllers.ErrorResponse:
     properties:
@@ -59,6 +58,8 @@ paths:
           description: helloworld
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Returns "helloworld"
       tags:
       - Example
@@ -123,4 +124,9 @@ paths:
       summary: Register new user
       tags:
       - auth
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
