@@ -34,10 +34,15 @@ func main() {
 	authService := &services.AuthService{
 		DB: database.GetDB(),
 	}
+	askLLMService := &services.AskLLMService{}
 
 	// Инициализация контроллера
 	authController := &controllers.AuthController{
 		Service: authService,
+	}
+
+	askLLMController := &controllers.AskLLMController{
+		Service: askLLMService,
 	}
 
 	r := gin.Default()
@@ -46,6 +51,7 @@ func main() {
 	{
 		v1.GET("/helloworld", Helloworld)
 		v1.POST("/register", authController.RegisterUser)
+		v1.POST("/ask", askLLMController.AskLLMQuestion)
 	}
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	r.Run(":8080")

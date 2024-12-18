@@ -6,6 +6,13 @@ definitions:
         description: Поле с описанием ошибки
         type: string
     type: object
+  dto.InputQuestionDTO:
+    properties:
+      question:
+        type: string
+    required:
+    - question
+    type: object
   dto.RegisterUserDTO:
     properties:
       email:
@@ -18,6 +25,11 @@ definitions:
     - email
     - password
     - username
+    type: object
+  models.Question:
+    properties:
+      question:
+        type: string
     type: object
   models.User:
     properties:
@@ -33,6 +45,32 @@ definitions:
 info:
   contact: {}
 paths:
+  /ask:
+    post:
+      consumes:
+      - application/json
+      description: Ввод текста, который будет передан ЛЛМ и возвращение ответа
+      parameters:
+      - description: Question data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/dto.InputQuestionDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Вопрос ЛЛМ отправлен
+          schema:
+            $ref: '#/definitions/models.Question'
+        "400":
+          description: Invalid input" // Указание структуры ошибки
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
+      summary: Задать вопрос ЛЛМ
+      tags:
+      - LLM
   /helloworld:
     get:
       consumes:

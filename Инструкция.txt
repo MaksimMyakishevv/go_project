@@ -1,0 +1,5 @@
+Запустить сервер FastAPI (он на порте 8000) http://localhost:8000/ask/
+ fastapi run ./main.py
+Отдельно запустить сервер Gin (он на порте 8080) http://localhost:8080/ask/
+ go run ./main.py
+Они через localhost общаются
