@@ -41,11 +41,16 @@ func main() {
 	AuthService := &services.AuthService{
 		DB: database.GetDB(),
 	}
+	askLLMService := &services.AskLLMService{}
 
 	// Инициализация контроллера
 	RegisController := &controllers.RegistController{
 		Service_regist: RegistService,
 		Service_auth:   AuthService,
+	}
+
+	askLLMController := &controllers.AskLLMController{
+		Service: askLLMService,
 	}
 
 	// Настройка маршрутов и Swagger документации
@@ -56,6 +61,7 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.POST("/register", RegisController.RegisterUser)
+<<<<<<< HEAD
 		v1.POST("/login", RegisController.LoginUser)
 	}
 
@@ -64,6 +70,10 @@ func main() {
 	protected.Use(middleware.AuthMiddleware())
 	{
 		protected.GET("/helloworld", Helloworld)
+=======
+		v1.POST("/ask", askLLMController.AskLLMQuestion)
+		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
+>>>>>>> 87700e882a4d819b843adbab77a66171e28b12aa
 	}
 
 	// Маршрут для Swagger документации

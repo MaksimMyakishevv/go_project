@@ -15,6 +15,46 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/ask": {
+            "post": {
+                "description": "Ввод текста, который будет передан ЛЛМ и возвращение ответа",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLM"
+                ],
+                "summary": "Задать вопрос ЛЛМ",
+                "parameters": [
+                    {
+                        "description": "Question data",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.InputQuestionDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Вопрос ЛЛМ отправлен",
+                        "schema": {
+                            "$ref": "#/definitions/models.Question"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input\" // Указание структуры ошибки",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/helloworld": {
             "get": {
                 "security": [
@@ -168,6 +208,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.InputQuestionDTO": {
+            "type": "object",
+            "required": [
+                "question"
+            ],
+            "properties": {
+                "question": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.RegisterUserDTO": {
             "type": "object",
             "required": [
@@ -183,6 +234,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Question": {
+            "type": "object",
+            "properties": {
+                "question": {
                     "type": "string"
                 }
             }
