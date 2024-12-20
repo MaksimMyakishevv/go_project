@@ -61,8 +61,7 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.POST("/register", RegisController.RegisterUser)
-<<<<<<< HEAD
-		v1.POST("/login", RegisController.LoginUser)
+		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
 	}
 
 	// Защищённые маршруты
@@ -70,12 +69,8 @@ func main() {
 	protected.Use(middleware.AuthMiddleware())
 	{
 		protected.GET("/helloworld", Helloworld)
-=======
 		v1.POST("/ask", askLLMController.AskLLMQuestion)
-		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
->>>>>>> 87700e882a4d819b843adbab77a66171e28b12aa
 	}
-
 	// Маршрут для Swagger документации
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
