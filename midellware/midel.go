@@ -36,7 +36,15 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		userID, err := utils.ExtractUserIDFromToken(authHeader)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: " + err.Error()})
+			c.Abort()
+			return
+		}
+
 		// Если токен валиден, продолжаем выполнение запроса
+		c.Set("userID", userID)
 		c.Next()
 	}
 }

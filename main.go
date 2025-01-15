@@ -35,19 +35,22 @@ func main() {
 	database.InitDB()
 
 	// Инициализация сервисов
-	RegistService := &services.RegistService{
+	registService := &services.RegistService{
 		DB: database.GetDB(),
 	}
-	AuthService := &services.AuthService{
+	authService := &services.AuthService{
+		DB: database.GetDB(),
+	}
+	preferenceService := &services.PreferenceService{
 		DB: database.GetDB(),
 	}
 	askLLMService := &services.AskLLMService{}
 	GetAddressesService := &services.GetAddressesService{}
 
-	// Инициализация контроллера
-	RegisController := &controllers.RegistController{
-		Service_regist: RegistService,
-		Service_auth:   AuthService,
+	// Инициализация контроллеров
+	regisController := &controllers.RegistController{
+		Service_regist: registService,
+		Service_auth:   authService,
 	}
 
 	askLLMController := &controllers.AskLLMController{
@@ -57,6 +60,10 @@ func main() {
 		Service: GetAddressesService,
 	}
 
+	preferenceController := &controllers.PreferenceController{
+		Service_prefernse: preferenceService,
+	}
+
 	// Настройка маршрутов и Swagger документации
 	r := gin.Default()
 	docs.SwaggerInfo.BasePath = "/api"
@@ -64,18 +71,24 @@ func main() {
 	// Открытые маршруты
 	v1 := r.Group("/api")
 	{
-		v1.POST("/register", RegisController.RegisterUser)
-		v1.POST("/login", RegisController.LoginUser) // добавлен роут для авторизации
-		v1.POST("/ask", askLLMController.AskLLMQuestion)
-		v1.POST("/addresses", GetAddressesController.GetAddresses)
+		v1.POST("/register", regisController.RegisterUser)
+		v1.POST("/login", regisController.LoginUser) // добавлен роут для авторизации
+		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
+		v1.POST("/addresses", GetAddressesController.GetAddresses) 
 	}
 
 	// Защищённые маршруты
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
+		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/helloworld", Helloworld)
+		protected.POST("/ask", askLLMController.AskLLMQuestion)
+		protected.GET("/preferences", preferenceController.GetPreferences)
+		protected.PUT("/preferences/:id", preferenceController.UpdatePreference)
+		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
 	}
+
 	// Маршрут для Swagger документации
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 

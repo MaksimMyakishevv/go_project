@@ -27,8 +27,8 @@ func InitDB() {
 		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
 
-	fmt.Println("Подключение к базе данных успешно установлено!")
-	err = db.AutoMigrate(&models.User{})
+	fmt.Println("Подключение к базе данных успешно установлено!") // Выводим сообщение об успешном подключении
+	err = db.AutoMigrate(&models.User{}, &models.Preference{})
 	if err != nil {
 		log.Fatalf("Ошибка миграции: %v", err)
 	}
