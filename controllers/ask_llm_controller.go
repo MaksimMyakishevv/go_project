@@ -33,7 +33,7 @@ func (controller *AskLLMController) AskLLMQuestion(c *gin.Context) {
 
 	message, err := controller.Service.AskLLMQuestion(question)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to forward item"})
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ask question"})
         return
     }
 

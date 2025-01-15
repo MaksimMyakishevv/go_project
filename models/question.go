@@ -1,5 +1,6 @@
 package models
 
 type Question struct {
-    Question_text string `json:"question"`
+    Preferences string `json:"preferences"`
+    Location string `json:"location"`
 }

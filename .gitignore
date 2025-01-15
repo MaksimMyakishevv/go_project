@@ -1,2 +1,6 @@
 .env
 llm.py
+
+docker-compose.yaml
+Dockerfile
+.dockerignore

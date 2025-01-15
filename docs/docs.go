@@ -15,6 +15,24 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/addresses": {
+            "post": {
+                "responses": {
+                    "201": {
+                        "description": "Массис отправлен",
+                        "schema": {
+                            "$ref": "#/definitions/models.Question"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input\" // Указание структуры ошибки",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ask": {
             "post": {
                 "description": "Ввод текста, который будет передан ЛЛМ и возвращение ответа",
@@ -193,6 +211,21 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.InputQuestionDTO": {
+            "type": "object",
+            "required": [
+                "location",
+                "preferences"
+            ],
+            "properties": {
+                "location": {
+                    "type": "string"
+                },
+                "preferences": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.LoginDTO": {
             "type": "object",
             "required": [
@@ -204,17 +237,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.InputQuestionDTO": {
-            "type": "object",
-            "required": [
-                "question"
-            ],
-            "properties": {
-                "question": {
                     "type": "string"
                 }
             }
@@ -241,7 +263,10 @@ const docTemplate = `{
         "models.Question": {
             "type": "object",
             "properties": {
-                "question": {
+                "location": {
+                    "type": "string"
+                },
+                "preferences": {
                     "type": "string"
                 }
             }

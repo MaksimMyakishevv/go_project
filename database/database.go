@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"new/models"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -13,19 +14,20 @@ import (
 var db *gorm.DB
 
 // InitDB инициализирует подключение к базе данных PostgreSQL
-// Используйте свою строку подключения к базе данных
+
 func InitDB() {
-	// Строка подключения: замените на свои данные (например, параметры подключения к PostgreSQL)
-	dsn := "host=localhost user=postgres password=postgres dbname=go port=5432 sslmode=disable"
+	time.Sleep(5 * time.Second) // Задержка на 5 секунд перед подключением для докеров нужна
+	// Строка подключения: замени на свои данные (например, параметры подключения к PostgreSQL)
+	dsn := "host=localhost user=root password=password dbname=demodb port=5433 sslmode=disable"
 
 	// Открытие подключения к базе данных PostgreSQL
 	var err error
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Ошибка подключения к базе данных: %v", err) // Логируем ошибку подключения
+		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
 
-	fmt.Println("Подключение к базе данных успешно установлено!") // Выводим сообщение об успешном подключении
+	fmt.Println("Подключение к базе данных успешно установлено!")
 	err = db.AutoMigrate(&models.User{})
 	if err != nil {
 		log.Fatalf("Ошибка миграции: %v", err)

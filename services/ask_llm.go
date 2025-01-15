@@ -17,7 +17,7 @@ func (s *AskLLMService) AskLLMQuestion(question models.Question) (string, error)
     }
 
     // Отправка POST запроса на FastAPI сервер открытый по порту 8000
-    resp, err := http.Post("http://localhost:8000/ask/", "application/json", bytes.NewBuffer(jsonData))
+    resp, err := http.Post("http://localhost:5555/ask/", "application/json", bytes.NewBuffer(jsonData))
     if err != nil {
         return "", err
     }

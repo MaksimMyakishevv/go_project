@@ -2,5 +2,6 @@ package dto
 
 
 type InputQuestionDTO struct {
-	Question    string `json:"question" binding:"required"`
+	Preferences    string `json:"preferences" binding:"required"`
+	Location    string `json:"location" binding:"required"`
 }

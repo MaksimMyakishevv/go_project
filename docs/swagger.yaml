@@ -9,6 +9,16 @@ definitions:
       token:
         type: string
     type: object
+  dto.InputQuestionDTO:
+    properties:
+      location:
+        type: string
+      preferences:
+        type: string
+    required:
+    - location
+    - preferences
+    type: object
   dto.LoginDTO:
     properties:
       email:
@@ -18,13 +28,6 @@ definitions:
     required:
     - email
     - password
-    type: object
-  dto.InputQuestionDTO:
-    properties:
-      question:
-        type: string
-    required:
-    - question
     type: object
   dto.RegisterUserDTO:
     properties:
@@ -41,7 +44,9 @@ definitions:
     type: object
   models.Question:
     properties:
-      question:
+      location:
+        type: string
+      preferences:
         type: string
     type: object
   models.User:
@@ -58,6 +63,17 @@ definitions:
 info:
   contact: {}
 paths:
+  /addresses:
+    post:
+      responses:
+        "201":
+          description: Массис отправлен
+          schema:
+            $ref: '#/definitions/models.Question'
+        "400":
+          description: Invalid input" // Указание структуры ошибки
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponse'
   /ask:
     post:
       consumes:
