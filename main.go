@@ -72,9 +72,9 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.POST("/register", regisController.RegisterUser)
-		v1.POST("/login", regisController.LoginUser) // добавлен роут для авторизации
+		v1.POST("/login", regisController.LoginUser)     // добавлен роут для авторизации
 		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
-		v1.POST("/addresses", GetAddressesController.GetAddresses) 
+		v1.POST("/addresses", GetAddressesController.GetAddresses)
 	}
 
 	// Защищённые маршруты
@@ -83,7 +83,6 @@ func main() {
 	{
 		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/helloworld", Helloworld)
-		protected.POST("/ask", askLLMController.AskLLMQuestion)
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.PUT("/preferences/:id", preferenceController.UpdatePreference)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)

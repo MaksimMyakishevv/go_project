@@ -19,7 +19,6 @@ type AskLLMController struct {
 // @Tags LLM
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Param user body dto.InputQuestionDTO true "Question data"
 // @Success 201 {object} models.Question "Вопрос ЛЛМ отправлен"
 // @Failure 400 {object} ErrorResponse "Invalid input" // Указание структуры ошибки
@@ -34,10 +33,10 @@ func (controller *AskLLMController) AskLLMQuestion(c *gin.Context) {
 	}
 
 	message, err := controller.Service.AskLLMQuestion(question)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ask question"})
-        return
-    }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ask question"})
+		return
+	}
 
 	// Возвращение результата в формате JSON
 	c.JSON(http.StatusOK, gin.H{"message": message})

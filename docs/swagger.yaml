@@ -9,20 +9,15 @@ definitions:
       token:
         type: string
     type: object
-  dto.InputQuestionDTO:
-    properties:
-      location:
-        type: string
-      preferences:
-        type: string
-    required:
-    - location
-    - preferences
-    type: object
   dto.CreatePreferenceDTO:
     properties:
       place:
-        description: Название места
+        description: Название места (выбор из фиксированного списка)
+        enum:
+        - Park
+        - Museum
+        - Beach
+        - Restaurant
         type: string
       priority:
         description: Приоритет должен быть неотрицательным
@@ -33,10 +28,13 @@ definitions:
     type: object
   dto.InputQuestionDTO:
     properties:
-      question:
+      location:
+        type: string
+      preferences:
         type: string
     required:
-    - question
+    - location
+    - preferences
     type: object
   dto.LoginDTO:
     properties:
@@ -137,8 +135,6 @@ paths:
           description: Invalid input" // Указание структуры ошибки
           schema:
             $ref: '#/definitions/controllers.ErrorResponse'
-      security:
-      - BearerAuth: []
       summary: Задать вопрос ЛЛМ
       tags:
       - LLM

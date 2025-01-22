@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"new/models"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -16,9 +18,25 @@ var db *gorm.DB
 // InitDB инициализирует подключение к базе данных PostgreSQL
 
 func InitDB() {
+
+	errr := godotenv.Load()
+	if errr != nil {
+		log.Fatalf("Ошибка загрузки .env файла: %v", errr)
+	}
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+
 	time.Sleep(5 * time.Second) // Задержка на 5 секунд перед подключением для докеров нужна
 	// Строка подключения: замени на свои данные (например, параметры подключения к PostgreSQL)
-	dsn := "host=localhost user=root password=password dbname=demodb port=5433 sslmode=disable"
+	dsn := "host=" + dbHost +
+		" user=" + dbUser +
+		" password=" + dbPassword +
+		" dbname=" + dbName +
+		" port=" + dbPort +
+		" sslmode=disable"
 
 	// Открытие подключения к базе данных PostgreSQL
 	var err error

@@ -35,11 +35,6 @@ const docTemplate = `{
         },
         "/ask": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Ввод текста, который будет передан ЛЛМ и возвращение ответа",
                 "consumes": [
                     "application/json"
@@ -395,6 +390,29 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreatePreferenceDTO": {
+            "type": "object",
+            "required": [
+                "place"
+            ],
+            "properties": {
+                "place": {
+                    "description": "Название места (выбор из фиксированного списка)",
+                    "type": "string",
+                    "enum": [
+                        "Park",
+                        "Museum",
+                        "Beach",
+                        "Restaurant"
+                    ]
+                },
+                "priority": {
+                    "description": "Приоритет должен быть неотрицательным",
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
         "dto.InputQuestionDTO": {
             "type": "object",
             "required": [
@@ -407,23 +425,6 @@ const docTemplate = `{
                 },
                 "preferences": {
                     "type": "string"
-                }
-            }
-        },
-        "dto.CreatePreferenceDTO": {
-            "type": "object",
-            "required": [
-                "place"
-            ],
-            "properties": {
-                "place": {
-                    "description": "Название места",
-                    "type": "string"
-                },
-                "priority": {
-                    "description": "Приоритет должен быть неотрицательным",
-                    "type": "integer",
-                    "minimum": 0
                 }
             }
         },
