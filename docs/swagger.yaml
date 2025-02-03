@@ -4,6 +4,11 @@ definitions:
       error:
         type: string
     type: object
+  controllers.PlaceErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
   controllers.TokenResponse:
     properties:
       token:
@@ -46,6 +51,15 @@ definitions:
     - email
     - password
     type: object
+  dto.ProcessPlacesDTO:
+    properties:
+      places:
+        items:
+          type: string
+        type: array
+    required:
+    - places
+    type: object
   dto.RegisterUserDTO:
     properties:
       email:
@@ -64,6 +78,17 @@ definitions:
       priority:
         description: Новый приоритет предпочтения
         minimum: 0
+        type: integer
+    type: object
+  models.Place:
+    properties:
+      id:
+        type: integer
+      place_name:
+        description: Название места
+        type: string
+      user_id:
+        description: Внешний ключ для связи с User
         type: integer
     type: object
   models.Preference:
@@ -299,6 +324,41 @@ paths:
       summary: Обновить предпочтение
       tags:
       - preferences
+  /process-places:
+    post:
+      consumes:
+      - application/json
+      description: Последовательно обрабатывает массив мест и отправляет их на нейросеть
+      parameters:
+      - description: Массив мест
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ProcessPlacesDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обработать массив мест
+      tags:
+      - places
   /register:
     post:
       consumes:
@@ -329,6 +389,27 @@ paths:
       summary: Register new user
       tags:
       - auth
+  /users/history:
+    get:
+      description: Возвращает список мест, связанных с пользователем
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Place'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить историю запросов
+      tags:
+      - places
 securityDefinitions:
   BearerAuth:
     in: header

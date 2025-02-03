@@ -46,9 +46,14 @@ func InitDB() {
 	}
 
 	fmt.Println("Подключение к базе данных успешно установлено!") // Выводим сообщение об успешном подключении
-	err = db.AutoMigrate(&models.User{}, &models.Preference{})
+	err = db.AutoMigrate(&models.User{}, &models.Preference{}, &models.Place{})
 	if err != nil {
 		log.Fatalf("Ошибка миграции: %v", err)
+	}
+	// Добавляем индекс на поле user_id
+	err = db.Exec("CREATE INDEX IF NOT EXISTS idx_places_user_id ON places(user_id)").Error
+	if err != nil {
+		log.Fatalf("Ошибка создания индекса: %v", err)
 	}
 }
 

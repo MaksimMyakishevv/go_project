@@ -326,6 +326,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/process-places": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Последовательно обрабатывает массив мест и отправляет их на нейросеть",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "places"
+                ],
+                "summary": "Обработать массив мест",
+                "parameters": [
+                    {
+                        "description": "Массив мест",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProcessPlacesDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/register": {
             "post": {
                 "description": "Register a new user by providing username, password, and email",
@@ -371,10 +426,52 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/users/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список мест, связанных с пользователем",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "places"
+                ],
+                "summary": "Получить историю запросов",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Place"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
         "controllers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.PlaceErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -443,6 +540,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ProcessPlacesDTO": {
+            "type": "object",
+            "required": [
+                "places"
+            ],
+            "properties": {
+                "places": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "dto.RegisterUserDTO": {
             "type": "object",
             "required": [
@@ -469,6 +580,22 @@ const docTemplate = `{
                     "description": "Новый приоритет предпочтения",
                     "type": "integer",
                     "minimum": 0
+                }
+            }
+        },
+        "models.Place": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "place_name": {
+                    "description": "Название места",
+                    "type": "string"
+                },
+                "user_id": {
+                    "description": "Внешний ключ для связи с User",
+                    "type": "integer"
                 }
             }
         },

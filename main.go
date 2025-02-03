@@ -44,6 +44,10 @@ func main() {
 	preferenceService := &services.PreferenceService{
 		DB: database.GetDB(),
 	}
+	placeService := &services.PlaceService{ // Добавляем сервис для работы с местами
+		DB: database.GetDB(),
+	}
+	go placeService.CleanupOldPlaces()
 	askLLMService := &services.AskLLMService{}
 	GetAddressesService := &services.GetAddressesService{}
 
@@ -62,6 +66,9 @@ func main() {
 
 	preferenceController := &controllers.PreferenceController{
 		Service_prefernse: preferenceService,
+	}
+	placeController := &controllers.PlaceController{ // Добавляем контроллер для работы с местами
+		Service: placeService,
 	}
 
 	// Настройка маршрутов и Swagger документации
@@ -86,6 +93,8 @@ func main() {
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.PUT("/preferences/:id", preferenceController.UpdatePreference)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
+		protected.GET("/users/history", placeController.GetUserHistory)  // Получение истории запросов пользователя
+		protected.POST("/process-places", placeController.ProcessPlaces) // Обработка массива мест
 	}
 
 	// Маршрут для Swagger документации
