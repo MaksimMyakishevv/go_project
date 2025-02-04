@@ -33,6 +33,7 @@ func Helloworld(c *gin.Context) {
 func main() {
 	// Инициализация подключения к базе данных
 	database.InitDB()
+	database.InitRedis()
 
 	// Инициализация сервисов
 	registService := &services.RegistService{
