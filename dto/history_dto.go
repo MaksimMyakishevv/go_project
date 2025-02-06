@@ -1,6 +1,6 @@
 package dto
 
-// AddPlaceDTO представляет данные для добавления нового места
+// AddPlaceDTO находит закешированный ответ от ллм модели
 type AddPlaceDTO struct {
 	PlaceName string `json:"place_name" binding:"required"`
 }

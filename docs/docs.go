@@ -73,6 +73,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/cached-response": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает закешированный ответ из Redis для конкретного пользователя и места",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "places"
+                ],
+                "summary": "Получить закешированный ответ",
+                "parameters": [
+                    {
+                        "description": "Запрос с названием места",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AddPlaceDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Верный формат",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный формат запроса",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Ответ не найден в кеше",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/helloworld": {
             "get": {
                 "security": [
@@ -487,6 +550,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AddPlaceDTO": {
+            "type": "object",
+            "required": [
+                "place_name"
+            ],
+            "properties": {
+                "place_name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CreatePreferenceDTO": {
             "type": "object",
             "required": [
@@ -586,6 +660,10 @@ const docTemplate = `{
         "models.Place": {
             "type": "object",
             "properties": {
+                "created_at": {
+                    "description": "Время создания записи",
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },

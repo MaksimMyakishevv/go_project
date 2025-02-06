@@ -40,7 +40,7 @@ func (s *PlaceService) AddPlace(userID uint, input dto.AddPlaceDTO) (*models.Pla
 	return place, nil
 }
 
-// GetUserHistory возвращает историю запросов пользователя
+// GetUserHistory возвращает историю запросов пользователя иза postgress
 func (s *PlaceService) GetUserHistory(userID uint) ([]models.Place, error) {
 	var places []models.Place
 	if err := s.DB.Where("user_id = ?", userID).Find(&places).Error; err != nil {
@@ -161,4 +161,28 @@ func (s *PlaceService) CleanupOldPlaces() {
 			fmt.Println("Старые записи успешно удалены")
 		}
 	}
+}
+
+// GetCachedResponse возвращает закешированный ответ из Redis для конкретного пользователя и места
+func (s *PlaceService) GetCachedResponse(userID uint, placeName string) (string, error) {
+	ctx := context.Background()
+
+	// Генерируем ключ для Redis с учетом userID и названия места
+	cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+
+	// Проверяем, есть ли ответ в Redis
+	cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result()
+	if err == redis.Nil {
+		// Ключ не найден
+		fmt.Printf("Ответ не найден в кеше для пользователя %d и места: %s\n", userID, placeName)
+		return "", fmt.Errorf("ответ не найден в кеше для места: %s", placeName)
+	} else if err != nil {
+		// Ошибка Redis
+		fmt.Printf("Ошибка при получении данных из Redis: %v\n", err)
+		return "", fmt.Errorf("ошибка при обращении к Redis: %v", err)
+	}
+
+	// Логируем успешное получение ответа
+	fmt.Printf("Ответ найден в кеше для пользователя %d и места: %s\n", userID, placeName)
+	return cachedResponse, nil
 }

@@ -94,8 +94,9 @@ func main() {
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.PUT("/preferences/:id", preferenceController.UpdatePreference)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
-		protected.GET("/users/history", placeController.GetUserHistory)  // Получение истории запросов пользователя
-		protected.POST("/process-places", placeController.ProcessPlaces) // Обработка массива мест
+		protected.GET("/users/history", placeController.GetUserHistory)       // Получение истории запросов пользователя
+		protected.POST("/process-places", placeController.ProcessPlaces)      // Обработка массива мест
+		protected.POST("/cached-response", placeController.GetCachedResponse) // Новый маршрут для получения закешированного ответа
 	}
 
 	// Маршрут для Swagger документации

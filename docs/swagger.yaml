@@ -14,6 +14,13 @@ definitions:
       token:
         type: string
     type: object
+  dto.AddPlaceDTO:
+    properties:
+      place_name:
+        type: string
+    required:
+    - place_name
+    type: object
   dto.CreatePreferenceDTO:
     properties:
       place:
@@ -82,6 +89,9 @@ definitions:
     type: object
   models.Place:
     properties:
+      created_at:
+        description: Время создания записи
+        type: string
       id:
         type: integer
       place_name:
@@ -163,6 +173,47 @@ paths:
       summary: Задать вопрос ЛЛМ
       tags:
       - LLM
+  /cached-response:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает закешированный ответ из Redis для конкретного пользователя
+        и места
+      parameters:
+      - description: Запрос с названием места
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AddPlaceDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Верный формат
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "400":
+          description: Неверный формат запроса
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "404":
+          description: Ответ не найден в кеше
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "500":
+          description: Ошибка сервера
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить закешированный ответ
+      tags:
+      - places
   /helloworld:
     get:
       consumes:

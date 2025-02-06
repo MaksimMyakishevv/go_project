@@ -77,3 +77,58 @@ func (c *PlaceController) ProcessPlaces(ctx *gin.Context) {
 	// Возвращаем результаты
 	ctx.JSON(http.StatusOK, results)
 }
+
+// GetCachedResponse godoc
+// @Summary      Получить закешированный ответ
+// @Description  Возвращает закешированный ответ из Redis для конкретного пользователя и места
+// @Tags         places
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        input  body      dto.AddPlaceDTO  true  "Запрос с названием места"
+// @Success      200    {object}  PlaceErrorResponse "Верный формат"
+// @Failure      400    {object}  PlaceErrorResponse "Неверный формат запроса"
+// @Failure      401    {object}  PlaceErrorResponse "Пользователь не авторизован"
+// @Failure      404    {object}  PlaceErrorResponse "Ответ не найден в кеше"
+// @Failure      500    {object}  PlaceErrorResponse "Ошибка сервера"
+// @Router       /cached-response [post]
+func (c *PlaceController) GetCachedResponse(ctx *gin.Context) {
+	var input dto.AddPlaceDTO
+	if err := ctx.ShouldBindJSON(&input); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
+		return
+	}
+
+	// Проверяем, что название места не пустое
+	if input.PlaceName == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Поле 'place_name' обязательно"})
+		return
+	}
+
+	// Извлекаем userID из JWT-токена
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	// Преобразуем userID в тип uint
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse userID"})
+		return
+	}
+
+	// Логируем запрос
+	println("Получен запрос на поиск закешированного ответа для пользователя:", userIDUint, "и места:", input.PlaceName)
+
+	// Получаем закешированный ответ
+	response, err := c.Service.GetCachedResponse(userIDUint, input.PlaceName)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Возвращаем успешный ответ
+	ctx.JSON(http.StatusOK, gin.H{"response": response})
+}
