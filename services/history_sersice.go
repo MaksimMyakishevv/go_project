@@ -50,7 +50,7 @@ func (s *PlaceService) GetUserHistory(userID uint) ([]models.Place, error) {
 }
 
 // ProcessPlace отправляет место на обработку нейросети с таймаутом 5 секунд
-func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, error) {
+func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, bool, error) {
 	ctx := context.Background()
 
 	// Генерируем ключ для Redis с учетом userID
@@ -59,7 +59,7 @@ func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, erro
 	// Проверяем, есть ли ответ в Redis
 	if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
 		fmt.Printf("Ответ найден в кеше для пользователя %d и места: %s\n", userID, placeName)
-		return cachedResponse, nil
+		return cachedResponse, true, nil // Возвращаем ответ и флаг "из кеша"
 	} else if err != redis.Nil {
 		// Если ошибка Redis не связана с отсутствием ключа, логируем её
 		fmt.Printf("Ошибка при получении данных из Redis: %v\n", err)
@@ -73,28 +73,28 @@ func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, erro
 	reqBody := map[string]string{"place_name": placeName}
 	jsonBody, _ := json.Marshal(reqBody)
 
-	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", "http://127.0.0.1:8000/random_text", bytes.NewBuffer(jsonBody)) // заглушка для теста редиса и его ключей
+	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", "http://127.0.0.1:8000/random_text", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	var neuralResponse struct {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(body, &neuralResponse); err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	// Сохраняем ответ в Redis
@@ -103,7 +103,7 @@ func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, erro
 		fmt.Printf("Ошибка при сохранении данных в Redis: %v\n", err)
 	}
 
-	return neuralResponse.Text, nil
+	return neuralResponse.Text, false, nil // Возвращаем ответ и флаг "не из кеша"
 }
 
 // ProcessPlaces обрабатывает массив мест и отправляет их на обработку нейросетью
@@ -111,29 +111,33 @@ func (s *PlaceService) ProcessPlaces(userID uint, places []string) ([]map[string
 	var results []map[string]interface{}
 
 	for _, placeName := range places {
-		// Добавляем место в историю пользователя
-		_, err := s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
-		if err != nil {
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "failed_to_add",
-				"response":   nil,
-			})
-			continue
-		}
-
 		// Отправляем запрос на нейросеть с таймаутом 5 секунд
-		result, err := s.ProcessPlace(userID, placeName)
+		result, isCached, err := s.ProcessPlace(userID, placeName)
 		if err != nil {
+			// Если произошла ошибка, добавляем результат с ошибкой
 			results = append(results, map[string]interface{}{
 				"place_name": placeName,
-				"status":     "timeout",
+				"status":     "timeout or no conection", // или другая ошибка
 				"response":   nil,
 			})
 			continue
 		}
 
-		// Сохраняем результат
+		// Если ответ НЕ из кеша, добавляем место в историю пользователя
+		if !isCached {
+			_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
+			if err != nil {
+				// Если не удалось добавить место в историю, добавляем результат с ошибкой
+				results = append(results, map[string]interface{}{
+					"place_name": placeName,
+					"status":     "failed_to_add",
+					"response":   nil,
+				})
+				continue
+			}
+		}
+
+		// Сохраняем успешный результат
 		results = append(results, map[string]interface{}{
 			"place_name": placeName,
 			"status":     "success",
