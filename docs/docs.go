@@ -73,6 +73,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/audio": {
+            "get": {
+                "description": "Возвращает список путей аудио из БД",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TTS"
+                ],
+                "summary": "Получить все пути аудио",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Audio"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Сохраняет путь до аудиофайла",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TTS"
+                ],
+                "summary": "Сохранить Аудио в БД postgres",
+                "parameters": [
+                    {
+                        "description": "Path data",
+                        "name": "audio",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AudioDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Путь сохранен в БД",
+                        "schema": {
+                            "$ref": "#/definitions/models.Audio"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input\" // Указание структуры ошибки",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/cached-response": {
             "post": {
                 "security": [
@@ -136,66 +203,19 @@ const docTemplate = `{
                 }
             }
         },
-        "/audio": {
+        "/files": {
             "get": {
-                "description": "Возвращает список путей аудио",
+                "description": "Возвращает список информации о файлах в бакете в ТЕРМИНАЛ",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "TTS"
                 ],
-                "summary": "Получить все аудио",
+                "summary": "Получить все файлы в бакете",
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Audio"
-                            }
-                        }
-                    },
                     "500": {
                         "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Сохраняет путь до аудиофайла",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TTS"
-                ],
-                "summary": "Сохранить Аудио в БД",
-                "parameters": [
-                    {
-                        "description": "Path data",
-                        "name": "audio",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AudioDTO"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Путь сохранен в БД",
-                        "schema": {
-                            "$ref": "#/definitions/models.Audio"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input\" // Указание структуры ошибки",
                         "schema": {
                             "$ref": "#/definitions/controllers.ErrorResponse"
                         }
@@ -550,6 +570,48 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict - user already exists",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/upload": {
+            "post": {
+                "description": "Загружает файл в Object Storage Яндекса",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TTS"
+                ],
+                "summary": "Загрузить файл в Object Storage",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input or upload failed",
                         "schema": {
                             "$ref": "#/definitions/controllers.ErrorResponse"
                         }

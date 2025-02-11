@@ -86,11 +86,13 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.POST("/register", regisController.RegisterUser)
-		v1.POST("/login", regisController.LoginUser)     // добавлен роут для авторизации
+		v1.POST("/login", regisController.LoginUser)     
 		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
 		v1.POST("/addresses", GetAddressesController.GetAddresses)
-		v1.POST("/audio", audioController.SaveAudio)
-		v1.GET("/audio", audioController.GetAllAudio)
+		v1.POST("/audio", audioController.SaveAudio) // сохраняет путь в postgres
+		v1.POST("/upload", audioController.LoadFile) //Загрузить аудио в S3
+		v1.GET("/audio", audioController.GetAllAudio) //выводит пути аудио из постгреса
+		v1.GET("/files", audioController.GetFiles)  //выводит в консоль файлы из бакета
 	}
 
 	// Защищённые маршруты
