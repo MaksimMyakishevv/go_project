@@ -136,6 +136,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/audio": {
+            "get": {
+                "description": "Возвращает список путей аудио",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TTS"
+                ],
+                "summary": "Получить все аудио",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Audio"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Сохраняет путь до аудиофайла",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "TTS"
+                ],
+                "summary": "Сохранить Аудио в БД",
+                "parameters": [
+                    {
+                        "description": "Path data",
+                        "name": "audio",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AudioDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Путь сохранен в БД",
+                        "schema": {
+                            "$ref": "#/definitions/models.Audio"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid input\" // Указание структуры ошибки",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/helloworld": {
             "get": {
                 "security": [
@@ -561,6 +628,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AudioDTO": {
+            "type": "object",
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CreatePreferenceDTO": {
             "type": "object",
             "required": [
@@ -654,6 +732,22 @@ const docTemplate = `{
                     "description": "Новый приоритет предпочтения",
                     "type": "integer",
                     "minimum": 0
+                }
+            }
+        },
+        "models.Audio": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "Время создания записи",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "path": {
+                    "description": "Путь",
+                    "type": "string"
                 }
             }
         },

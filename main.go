@@ -45,6 +45,9 @@ func main() {
 	preferenceService := &services.PreferenceService{
 		DB: database.GetDB(),
 	}
+	audioService := &services.AudioService{
+		DB: database.GetDB(),
+	}
 	placeService := &services.PlaceService{ // Добавляем сервис для работы с местами
 		DB: database.GetDB(),
 	}
@@ -68,6 +71,9 @@ func main() {
 	preferenceController := &controllers.PreferenceController{
 		Service_prefernse: preferenceService,
 	}
+	audioController := &controllers.AudioController{
+		Service: audioService,
+	}
 	placeController := &controllers.PlaceController{ // Добавляем контроллер для работы с местами
 		Service: placeService,
 	}
@@ -83,6 +89,8 @@ func main() {
 		v1.POST("/login", regisController.LoginUser)     // добавлен роут для авторизации
 		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
 		v1.POST("/addresses", GetAddressesController.GetAddresses)
+		v1.POST("/audio", audioController.SaveAudio)
+		v1.GET("/audio", audioController.GetAllAudio)
 	}
 
 	// Защищённые маршруты
