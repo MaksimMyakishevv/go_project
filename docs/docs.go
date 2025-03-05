@@ -381,62 +381,6 @@ const docTemplate = `{
             }
         },
         "/preferences/{id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Изменяет приоритет предпочтения пользователя",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "preferences"
-                ],
-                "summary": "Обновить предпочтение",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID предпочтения",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Новый приоритет",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdatePreferenceDTO"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Preference"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            },
             "delete": {
                 "security": [
                     {
@@ -716,11 +660,6 @@ const docTemplate = `{
                         "Beach",
                         "Restaurant"
                     ]
-                },
-                "priority": {
-                    "description": "Приоритет должен быть неотрицательным",
-                    "type": "integer",
-                    "minimum": 0
                 }
             }
         },
@@ -787,16 +726,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdatePreferenceDTO": {
-            "type": "object",
-            "properties": {
-                "priority": {
-                    "description": "Новый приоритет предпочтения",
-                    "type": "integer",
-                    "minimum": 0
-                }
-            }
-        },
         "models.Audio": {
             "type": "object",
             "properties": {
@@ -842,10 +771,6 @@ const docTemplate = `{
                 "place": {
                     "description": "Название места",
                     "type": "string"
-                },
-                "priority": {
-                    "description": "Приоритет",
-                    "type": "integer"
                 },
                 "user_id": {
                     "description": "Внешний ключ для связи с User",

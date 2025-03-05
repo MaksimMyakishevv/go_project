@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"new/dto"
-	"new/models"
 	"new/services"
 
 	"github.com/gin-gonic/gin"
@@ -108,36 +107,6 @@ func (c *PreferenceController) DeletePreference(ctx *gin.Context) {
 	}
 
 	ctx.Status(http.StatusNoContent)
-}
-
-// UpdatePreference godoc
-// @Summary      Обновить предпочтение
-// @Description  Изменяет приоритет предпочтения пользователя
-// @Tags         preferences
-// @Security BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id    path      int                      true  "ID предпочтения"
-// @Param        input body      dto.UpdatePreferenceDTO  true  "Новый приоритет"
-// @Success      200   {object}  models.Preference
-// @Failure      400   {object}  ErrorResponse
-// @Failure      500   {object}  ErrorResponse
-// @Router       /preferences/{id} [put]
-func (c *PreferenceController) UpdatePreference(ctx *gin.Context) {
-	preferenceID := ctx.Param("id")
-	var input dto.UpdatePreferenceDTO
-	if err := ctx.ShouldBindBodyWith(&input, binding.JSON); err != nil {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	userID := ctx.GetUint("userID") // Предполагается, что userID извлекается из middleware
-	if err := c.Service_prefernse.UpdatePreference(userID, parseUint(preferenceID), input.Priority); err != nil {
-		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, models.Preference{ID: parseUint(preferenceID), Priority: input.Priority})
 }
 
 func parseUint(value string) uint {

@@ -86,13 +86,13 @@ func main() {
 	v1 := r.Group("/api")
 	{
 		v1.POST("/register", regisController.RegisterUser)
-		v1.POST("/login", regisController.LoginUser)     
+		v1.POST("/login", regisController.LoginUser)
 		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
 		v1.POST("/addresses", GetAddressesController.GetAddresses)
-		v1.POST("/audio", audioController.SaveAudio) // сохраняет путь в postgres
-		v1.POST("/upload", audioController.LoadFile) //Загрузить аудио в S3
+		v1.POST("/audio", audioController.SaveAudio)  // сохраняет путь в postgres
+		v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
 		v1.GET("/audio", audioController.GetAllAudio) //выводит пути аудио из постгреса
-		v1.GET("/files", audioController.GetFiles)  //выводит в консоль файлы из бакета
+		v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
 	}
 
 	// Защищённые маршруты
@@ -102,7 +102,6 @@ func main() {
 		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/helloworld", Helloworld)
 		protected.GET("/preferences", preferenceController.GetPreferences)
-		protected.PUT("/preferences/:id", preferenceController.UpdatePreference)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
 		protected.GET("/users/history", placeController.GetUserHistory)       // Получение истории запросов пользователя
 		protected.POST("/process-places", placeController.ProcessPlaces)      // Обработка массива мест

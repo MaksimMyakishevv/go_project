@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"new/dto"
 	"new/models"
 
@@ -20,9 +19,8 @@ func NewPreferenceService(db *gorm.DB) *PreferenceService {
 func (s *PreferenceService) CreatePreference(userID uint, input dto.CreatePreferenceDTO) (*models.Preference, error) {
 	// Создаем новое предпочтение
 	preference := &models.Preference{
-		UserID:   userID,
-		Place:    input.Place,
-		Priority: input.Priority,
+		UserID:         userID,
+		ListPreference: models.ListPreference{},
 	}
 
 	// Сохраняем предпочтение в базе данных
@@ -47,22 +45,6 @@ func (s *PreferenceService) GetPreferencesByUserID(userID uint) ([]models.Prefer
 // DeletePreference удаляет предпочтение по ID и UserID
 func (s *PreferenceService) DeletePreference(userID, preferenceID uint) error {
 	if err := s.DB.Where("id = ? AND user_id = ?", preferenceID, userID).Delete(&models.Preference{}).Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// UpdatePreference обновляет приоритет предпочтения
-func (s *PreferenceService) UpdatePreference(userID, preferenceID uint, priority int) error {
-	var preference models.Preference
-
-	if err := s.DB.Where("id = ? AND user_id = ?", preferenceID, userID).First(&preference).Error; err != nil {
-		return errors.New("preference not found")
-	}
-
-	preference.Priority = priority
-	if err := s.DB.Save(&preference).Error; err != nil {
 		return err
 	}
 

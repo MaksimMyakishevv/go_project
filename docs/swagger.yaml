@@ -38,10 +38,6 @@ definitions:
         - Beach
         - Restaurant
         type: string
-      priority:
-        description: Приоритет должен быть неотрицательным
-        minimum: 0
-        type: integer
     required:
     - place
     type: object
@@ -87,13 +83,6 @@ definitions:
     - password
     - username
     type: object
-  dto.UpdatePreferenceDTO:
-    properties:
-      priority:
-        description: Новый приоритет предпочтения
-        minimum: 0
-        type: integer
-    type: object
   models.Audio:
     properties:
       created_at:
@@ -126,9 +115,6 @@ definitions:
       place:
         description: Название места
         type: string
-      priority:
-        description: Приоритет
-        type: integer
       user_id:
         description: Внешний ключ для связи с User
         type: integer
@@ -412,42 +398,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Удалить предпочтение
-      tags:
-      - preferences
-    put:
-      consumes:
-      - application/json
-      description: Изменяет приоритет предпочтения пользователя
-      parameters:
-      - description: ID предпочтения
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Новый приоритет
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdatePreferenceDTO'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Preference'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/controllers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/controllers.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Обновить предпочтение
       tags:
       - preferences
   /process-places:

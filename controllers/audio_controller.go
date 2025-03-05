@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"new/dto"
@@ -78,11 +79,10 @@ func (c *AudioController) GetFiles(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 		return
 	}
-	audio:="Проверь консоль сервера, туда вывело"
+	audio := "Проверь консоль сервера, туда вывело"
 
 	ctx.JSON(http.StatusOK, audio)
 }
-
 
 // UploadFile godoc
 // @Summary Загрузить файл в Object Storage
@@ -95,31 +95,38 @@ func (c *AudioController) GetFiles(ctx *gin.Context) {
 // @Failure 400 {object} ErrorResponse "Invalid input or upload failed"
 // @Router /upload [post]
 func (ac *AudioController) LoadFile(c *gin.Context) {
-
 	bucketName := os.Getenv("BUCKET_NAME")
-	
+
 	// 1. Получение файла из запроса
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("Ошибка при получении файла: %s", err.Error()))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Ошибка при получении файла: %s", err.Error()),
+		})
 		return
 	}
 	defer file.Close()
 
 	// 2. Создаем модель UploadedFile
 	uploadedFile := models.UploadedFile{
-		File: file,
+		File:     file,
 		Filename: header.Filename,
-		Size: header.Size,
+		Size:     header.Size,
 	}
 
-
 	// 3. Вызываем сервис для загрузки файла
-	err = ac.Service.LoadFile(uploadedFile, c)
+	ctx := context.Background()
+	fileURL, err := ac.Service.LoadFile(uploadedFile, ctx)
 	if err != nil {
-		c.String(http.StatusInternalServerError, fmt.Sprintf("Ошибка при загрузке файла: %s", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("Ошибка при загрузке файла: %s", err.Error()),
+		})
 		return
 	}
 
-	c.String(http.StatusOK, fmt.Sprintf("Файл '%s' успешно загружен в bucket '%s'", uploadedFile.Filename, bucketName))
+	// 4. Возвращаем успешный ответ с ссылкой на файл
+	c.JSON(http.StatusOK, gin.H{
+		"message":  fmt.Sprintf("Файл '%s' успешно загружен в bucket '%s'", uploadedFile.Filename, bucketName),
+		"file_url": fileURL,
+	})
 }

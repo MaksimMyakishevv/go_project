@@ -26,11 +26,10 @@ type AudioService struct {
 	DB *gorm.DB
 }
 
-
 func (s *AudioService) SaveAudio(input dto.AudioDTO) (*models.Audio, error) {
 
 	file_path := &models.Audio{
-		Path:    input.Path,
+		Path: input.Path,
 	}
 
 	// Сохраняем в базе данных
@@ -51,60 +50,54 @@ func (s *AudioService) GetAllAudio() ([]models.Audio, error) {
 	return audio, nil
 }
 
-
-
 func (s *AudioService) GetFiles() error {
 
-	bucketName := os.Getenv("BUCKET_NAME")
+	// Подгружаем конфигурацию из ~/.aws/*
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Подгружаем конфигурацию из ~/.aws/*
-    cfg, err := config.LoadDefaultConfig(context.TODO())
-    if err != nil {
-        log.Fatal(err)
-		return err
-    }
+	// Создаем клиента для доступа к хранилищу S3
+	client := s3.NewFromConfig(cfg)
 
-    // Создаем клиента для доступа к хранилищу S3
-    client := s3.NewFromConfig(cfg)
+	// Запрашиваем список бакетов
+	result, err := client.ListBuckets(context.TODO(), &s3.ListBucketsInput{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Запрашиваем список всех файлов в бакете
-    result, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-        Bucket: aws.String(bucketName),
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    for _, object := range result.Contents {
-        log.Printf("object=%s size=%d Bytes last modified=%s", aws.ToString(object.Key), aws.ToInt64(object.Size), object.LastModified.Local().Format("2006-01-02 15:04:05 Monday"))
-    }
-
+	for _, bucket := range result.Buckets {
+		log.Printf("bucket=%s creation time=%s", aws.ToString(bucket.Name), bucket.CreationDate.Local().Format("2006-01-02 15:04:05 Monday"))
+	}
 	return nil
 }
 
-func (s *AudioService) LoadFile(file models.UploadedFile, ctx context.Context) error {
-
+func (s *AudioService) LoadFile(file models.UploadedFile, ctx context.Context) (string, error) {
 	bucketName := os.Getenv("BUCKET_NAME")
-	keyPrefix := os.Getenv("KEY_PREFIX2") //если нужно сохранять файл в папке бакета - то тут путь будет
+	keyPrefix := os.Getenv("KEY_PREFIX2") // Если нужно сохранять файл в папке бакета - то тут путь будет
+	region := os.Getenv("AWS_REGION")     // Регион AWS
 
-    // Подгружаем конфигурацию из ~/.aws/*
-    cfg, err := config.LoadDefaultConfig(context.TODO())
-    if err != nil {
-        log.Fatal(err)
-		return err
-    }
+	// Подгружаем конфигурацию из ~/.aws/*
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+		return "", err
+	}
 
-    // Создаем клиента для доступа к хранилищу S3
-    client := s3.NewFromConfig(cfg)
+	// Создаем клиента для доступа к хранилищу S3
+	client := s3.NewFromConfig(cfg)
 
+	// Формируем полный ключ объекта
 	objectKey := keyPrefix + file.Filename
 	fileName := file.Filename
 
+	// Загружаем файл в S3
 	_, err = client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(objectKey),
 		Body:   file.File,
-			})
+	})
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "EntityTooLarge" {
@@ -115,16 +108,22 @@ func (s *AudioService) LoadFile(file models.UploadedFile, ctx context.Context) e
 			log.Printf("Couldn't upload file %v to %v:%v. Here's why: %v\n",
 				fileName, bucketName, objectKey, err)
 		}
+		return "", err
+	}
+
+	// Проверяем существование объекта
 	err = s3.NewObjectExistsWaiter(client).Wait(
 		ctx, &s3.HeadObjectInput{Bucket: aws.String(bucketName), Key: aws.String(objectKey)}, time.Minute)
 	if err != nil {
 		log.Printf("Failed attempt to wait for object %s to exist.\n", objectKey)
+		return "", err
 	}
 
-	return err
-	}
+	// Генерируем публичную ссылку на файл
+	fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectKey)
 
-	return err
+	// Возвращаем ссылку на файл
+	return fileURL, nil
 }
 
 // На данный момент эта функция нигде не используется, и я не проверяла работает ли вообще

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"new/database"
@@ -90,20 +92,35 @@ func (s *PlaceService) ProcessPlace(userID uint, placeName string) (string, bool
 		return "", false, err
 	}
 
-	var neuralResponse struct {
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(body, &neuralResponse); err != nil {
-		return "", false, err
+	// Ищем разделитель
+	separator := []byte("---AUDIO---")
+	sepIndex := bytes.Index(body, separator)
+	if sepIndex == -1 {
+		return "", false, fmt.Errorf("разделитель ---AUDIO--- не найден")
 	}
 
-	// Сохраняем ответ в Redis
-	expiration := 24 * time.Hour // Время жизни кеша (например, 24 часа)
-	if err := database.RedisClient.Set(ctx, cacheKey, neuralResponse.Text, expiration).Err(); err != nil {
+	// Извлекаем текст
+	textBytes := body[:sepIndex]
+	text := string(textBytes)
+
+	// Извлекаем аудио
+	audioData := body[sepIndex+len(separator):]
+
+	// Сохраняем аудиофайл локально
+	desktopPath := filepath.Join(os.Getenv("HOME"), "Рабочий стол")
+	fileName := fmt.Sprintf("audio_%d_%s.mp3", userID, placeName)
+	filePath := filepath.Join(desktopPath, fileName)
+	if err := os.WriteFile(filePath, audioData, 0644); err != nil {
+		return "", false, fmt.Errorf("ошибка сохранения аудиофайла: %v", err)
+	}
+
+	// Сохраняем текст в Redis
+	expiration := 24 * time.Hour
+	if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
 		fmt.Printf("Ошибка при сохранении данных в Redis: %v\n", err)
 	}
 
-	return neuralResponse.Text, false, nil // Возвращаем ответ и флаг "не из кеша"
+	return text, false, nil
 }
 
 // ProcessPlaces обрабатывает массив мест и отправляет их на обработку нейросетью
