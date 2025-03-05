@@ -4,8 +4,14 @@ package dto
 type AddPlaceDTO struct {
 	PlaceName string `json:"place_name" binding:"required"`
 }
+type OSMObject struct {
+	Type  string            `json:"type"`
+	ID    int               `json:"id"`
+	Nodes []int             `json:"nodes"`
+	Tags  map[string]string `json:"tags"`
+}
 
 // ProcessPlacesDTO представляет массив мест для обработки
 type ProcessPlacesDTO struct {
-	Places []string `json:"places" binding:"required"`
+	JSONData []OSMObject `json:"json_data" binding:"required"`
 }

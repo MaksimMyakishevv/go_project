@@ -30,16 +30,10 @@ definitions:
     type: object
   dto.CreatePreferenceDTO:
     properties:
-      place:
-        description: Название места (выбор из фиксированного списка)
-        enum:
-        - Park
-        - Museum
-        - Beach
-        - Restaurant
-        type: string
+      list_preference_id:
+        type: integer
     required:
-    - place
+    - list_preference_id
     type: object
   dto.InputQuestionDTO:
     properties:
@@ -61,14 +55,29 @@ definitions:
     - email
     - password
     type: object
+  dto.OSMObject:
+    properties:
+      id:
+        type: integer
+      nodes:
+        items:
+          type: integer
+        type: array
+      tags:
+        additionalProperties:
+          type: string
+        type: object
+      type:
+        type: string
+    type: object
   dto.ProcessPlacesDTO:
     properties:
-      places:
+      json_data:
         items:
-          type: string
+          $ref: '#/definitions/dto.OSMObject'
         type: array
     required:
-    - places
+    - json_data
     type: object
   dto.RegisterUserDTO:
     properties:
@@ -94,6 +103,13 @@ definitions:
         description: Путь
         type: string
     type: object
+  models.ListPreference:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   models.Place:
     properties:
       created_at:
@@ -112,9 +128,10 @@ definitions:
     properties:
       id:
         type: integer
-      place:
-        description: Название места
-        type: string
+      list_preference:
+        $ref: '#/definitions/models.ListPreference'
+      list_preference_id:
+        type: integer
       user_id:
         description: Внешний ключ для связи с User
         type: integer
@@ -400,13 +417,13 @@ paths:
       summary: Удалить предпочтение
       tags:
       - preferences
-  /process-places:
+  /process-json:
     post:
       consumes:
       - application/json
-      description: Последовательно обрабатывает массив мест и отправляет их на нейросеть
+      description: Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть
       parameters:
-      - description: Массив мест
+      - description: JSON-файл с местами
         in: body
         name: input
         required: true
@@ -432,7 +449,7 @@ paths:
             $ref: '#/definitions/controllers.PlaceErrorResponse'
       security:
       - BearerAuth: []
-      summary: Обработать массив мест
+      summary: Обработать JSON-файл с местами
       tags:
       - places
   /register:

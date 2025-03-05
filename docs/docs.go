@@ -420,14 +420,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/process-places": {
+        "/process-json": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Последовательно обрабатывает массив мест и отправляет их на нейросеть",
+                "description": "Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть",
                 "consumes": [
                     "application/json"
                 ],
@@ -437,10 +437,10 @@ const docTemplate = `{
                 "tags": [
                     "places"
                 ],
-                "summary": "Обработать массив мест",
+                "summary": "Обработать JSON-файл с местами",
                 "parameters": [
                     {
-                        "description": "Массив мест",
+                        "description": "JSON-файл с местами",
                         "name": "input",
                         "in": "body",
                         "required": true,
@@ -648,18 +648,11 @@ const docTemplate = `{
         "dto.CreatePreferenceDTO": {
             "type": "object",
             "required": [
-                "place"
+                "list_preference_id"
             ],
             "properties": {
-                "place": {
-                    "description": "Название места (выбор из фиксированного списка)",
-                    "type": "string",
-                    "enum": [
-                        "Park",
-                        "Museum",
-                        "Beach",
-                        "Restaurant"
-                    ]
+                "list_preference_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -693,16 +686,39 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.OSMObject": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "tags": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.ProcessPlacesDTO": {
             "type": "object",
             "required": [
-                "places"
+                "json_data"
             ],
             "properties": {
-                "places": {
+                "json_data": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/dto.OSMObject"
                     }
                 }
             }
@@ -742,6 +758,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ListPreference": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Place": {
             "type": "object",
             "properties": {
@@ -768,9 +795,11 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "place": {
-                    "description": "Название места",
-                    "type": "string"
+                "list_preference": {
+                    "$ref": "#/definitions/models.ListPreference"
+                },
+                "list_preference_id": {
+                    "type": "integer"
                 },
                 "user_id": {
                     "description": "Внешний ключ для связи с User",

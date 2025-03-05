@@ -104,7 +104,7 @@ func main() {
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
 		protected.GET("/users/history", placeController.GetUserHistory)       // Получение истории запросов пользователя
-		protected.POST("/process-places", placeController.ProcessPlaces)      // Обработка массива мест
+		protected.POST("/process-json", placeController.ProcessJSON)          // Обработка массива мест
 		protected.POST("/cached-response", placeController.GetCachedResponse) // Новый маршрут для получения закешированного ответа
 	}
 

@@ -37,19 +37,19 @@ func (c *PlaceController) GetUserHistory(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, history)
 }
 
-// ProcessPlaces godoc
-// @Summary      Обработать массив мест
-// @Description  Последовательно обрабатывает массив мест и отправляет их на нейросеть
+// ProcessJSON godoc
+// @Summary      Обработать JSON-файл с местами
+// @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть
 // @Tags         places
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        input  body      dto.ProcessPlacesDTO  true  "Массив мест"
+// @Param        input  body      dto.ProcessPlacesDTO  true  "JSON-файл с местами"
 // @Success      200    {array}   map[string]interface{}
 // @Failure      400    {object}  PlaceErrorResponse
 // @Failure      500    {object}  PlaceErrorResponse
-// @Router       /process-places [post]
-func (c *PlaceController) ProcessPlaces(ctx *gin.Context) {
+// @Router       /process-json [post]
+func (c *PlaceController) ProcessJSON(ctx *gin.Context) {
 	var input dto.ProcessPlacesDTO
 	// Проверяем и парсим тело запроса
 	if err := ctx.ShouldBindJSON(&input); err != nil {
@@ -68,8 +68,8 @@ func (c *PlaceController) ProcessPlaces(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Failed to parse userID"})
 		return
 	}
-	// Вызываем сервис для обработки массива мест
-	results, err := c.Service.ProcessPlaces(userIDUint, input.Places)
+	// Вызываем сервис для обработки JSON-файла
+	results, err := c.Service.ProcessJSON(userIDUint, input.JSONData)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
 		return
