@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	backgroundprocesses "new/background_processes"
 	"new/controllers"
 	"new/database"
 	docs "new/docs"
@@ -51,7 +52,10 @@ func main() {
 	placeService := &services.PlaceService{ // Добавляем сервис для работы с местами
 		DB: database.GetDB(),
 	}
-	go placeService.CleanupOldPlaces()
+	delethistory := &backgroundprocesses.Deletehistory{
+		DB: database.GetDB(),
+	}
+	go delethistory.CleanupOldPlaces()
 	askLLMService := &services.AskLLMService{}
 	GetAddressesService := &services.GetAddressesService{}
 

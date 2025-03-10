@@ -167,21 +167,6 @@ func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([
 	return results, nil
 }
 
-// CleanupOldPlaces удаляет записи старше 1 часа
-func (s *PlaceService) CleanupOldPlaces() {
-	ticker := time.NewTicker(1 * time.Hour) // Запуск каждые 1 час
-	defer ticker.Stop()
-
-	for range ticker.C {
-		cutoffTime := time.Now().Add(-1 * time.Hour)
-		if err := s.DB.Where("created_at < ?", cutoffTime).Delete(&models.Place{}).Error; err != nil {
-			fmt.Printf("Ошибка при удалении старых записей: %v\n", err)
-		} else {
-			fmt.Println("Старые записи успешно удалены")
-		}
-	}
-}
-
 // GetCachedResponse возвращает закешированный ответ из Redis
 func (s *PlaceService) GetCachedResponse(userID uint, placeName string) (string, error) {
 	ctx := context.Background()
