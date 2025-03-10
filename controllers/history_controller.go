@@ -37,6 +37,40 @@ func (c *PlaceController) GetUserHistory(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, history)
 }
 
+// GenerateAudio godoc
+// @Summary      Сгенерировать аудио
+// @Description  Генерирует аудиофайл в формате MP3
+// @Tags         audio
+// @Accept       json
+// @Produce      octet-stream
+// @Param        input body dto.AudioDTO true "Текст для генерации аудио"
+// @Success      200  {string}  binary  "Бинарные данные аудиофайла"
+// @Failure      400  {object}  PlaceErrorResponse
+// @Failure      500  {object}  PlaceErrorResponse
+// @Router       /audio/generate [post]
+func (c *PlaceController) GenerateAudio(ctx *gin.Context) {
+	var request dto.AudioDTO
+
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Некорректный запрос: " + err.Error()})
+		return
+	}
+
+	if request.Path == "" {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Поле 'path' обязательно"})
+		return
+	}
+
+	audioData, err := c.Service.AudioGenerate(request.Path)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Ошибка генерации: " + err.Error()})
+		return
+	}
+
+	// Отправляем аудио как бинарный поток
+	ctx.JSON(http.StatusOK, audioData)
+}
+
 // ProcessJSON godoc
 // @Summary      Обработать JSON-файл с местами
 // @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть

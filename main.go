@@ -97,6 +97,7 @@ func main() {
 		v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
 		v1.GET("/audio", audioController.GetAllAudio) //выводит пути аудио из постгреса
 		v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
+		v1.POST("/audio/generate", placeController.GenerateAudio)
 	}
 
 	// Защищённые маршруты

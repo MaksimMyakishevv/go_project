@@ -238,6 +238,36 @@ paths:
       summary: Сохранить Аудио в БД postgres
       tags:
       - TTS
+  /audio/generate:
+    post:
+      consumes:
+      - application/json
+      description: Генерирует аудиофайл в формате MP3
+      parameters:
+      - description: Текст для генерации аудио
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AudioDTO'
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Бинарные данные аудиофайла
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+      summary: Сгенерировать аудио
+      tags:
+      - audio
   /cached-response:
     post:
       consumes:
