@@ -122,6 +122,13 @@ func (s *PlaceService) SendToLLM(placeData map[string]string) (string, error) {
 		AddrStreet      string `json:"addr:street"`
 		AddrHousenumber string `json:"addr:housenumber"`
 		Name            string `json:"name"`
+		Amenity            string `json:"amenity"`
+		Tourism            string `json:"tourism"`
+		Highway            string `json:"highway"`
+		Leisure            string `json:"leisure"`
+		Building            string `json:"building"`
+		Inscription            string `json:"inscription"`
+		Description            string `json:"description"`
 	}
 
 	reqBody := PlaceData{
@@ -129,7 +136,15 @@ func (s *PlaceService) SendToLLM(placeData map[string]string) (string, error) {
 		AddrStreet:      placeData["addr:street"],
 		AddrHousenumber: placeData["addr:housenumber"],
 		Name:            placeData["name"],
+		Amenity:        placeData["amenity"],
+		Tourism:      placeData["tourism"],
+		Highway: placeData["highway"],
+		Leisure:            placeData["leisure"],
+		Building: placeData["building"],
+		Inscription: placeData["inscription"],
+		Description: placeData["description"],
 	}
+
 
 	// Формируем тело запроса
 	// reqBody := map[string]string{

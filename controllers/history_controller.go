@@ -48,7 +48,7 @@ func (c *PlaceController) GetUserHistory(ctx *gin.Context) {
 // @Failure      400  {object}  PlaceErrorResponse
 // @Failure      500  {object}  PlaceErrorResponse
 // @Router       /audio/generate [post]
-func (c *PlaceController) GenerateAudio(ctx *gin.Context) {
+func (c *PlaceController) GenerateAudioFromText(ctx *gin.Context) {
 	var request dto.AudioDTO
 
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -56,12 +56,12 @@ func (c *PlaceController) GenerateAudio(ctx *gin.Context) {
 		return
 	}
 
-	if request.Path == "" {
-		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Поле 'path' обязательно"})
+	if request.Message == "" {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Поле 'message' обязательно"})
 		return
 	}
 
-	audioData, err := c.Service.AudioGenerate(request.Path)
+	audioData, err := c.Service.AudioGenerate(request.Message)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Ошибка генерации: " + err.Error()})
 		return
