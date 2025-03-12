@@ -116,13 +116,28 @@ func (s *PlaceService) SendToLLM(placeData map[string]string) (string, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Формируем тело запроса
-	reqBody := map[string]string{
-		"addr:city":        placeData["addr:city"],
-		"addr:street":      placeData["addr:street"],
-		"addr:housenumber": placeData["addr:housenumber"],
-		"name":             placeData["name"],
+	// struct используется, т.к. json.Marshal сортирует ключи в алфавитном порядке, что портит адрес и путает ллм
+	type PlaceData struct {
+		AddrCity        string `json:"addr:city"`
+		AddrStreet      string `json:"addr:street"`
+		AddrHousenumber string `json:"addr:housenumber"`
+		Name            string `json:"name"`
 	}
+
+	reqBody := PlaceData{
+		AddrCity:        placeData["addr:city"],
+		AddrStreet:      placeData["addr:street"],
+		AddrHousenumber: placeData["addr:housenumber"],
+		Name:            placeData["name"],
+	}
+
+	// Формируем тело запроса
+	// reqBody := map[string]string{
+	// 	"addr:city":        placeData["addr:city"],
+	// 	"addr:street":      placeData["addr:street"],
+	// 	"addr:housenumber": placeData["addr:housenumber"],
+	// 	"name":             placeData["name"],
+	// }
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("ошибка при маршалинге JSON: %v", err)
@@ -158,7 +173,7 @@ func (s *PlaceService) SendToLLM(placeData map[string]string) (string, error) {
 
 	// Декодируем JSON-ответ
 	var response struct {
-		Text string `json:"text"`
+		Text string `json:"message"`
 	}
 
 	if err := json.Unmarshal(body, &response); err != nil {
@@ -175,7 +190,7 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 	client := &http.Client{}
 
 	// Формируем тело запроса в формате JSON
-	reqBody := map[string]string{"text": text}
+	reqBody := map[string]string{"message": text}
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при маршалинге JSON: %v", err)
