@@ -5,10 +5,17 @@ type AddPlaceDTO struct {
 	PlaceName string `json:"place_name" binding:"required"`
 }
 type OSMObject struct {
-	Type  string            `json:"type"`
-	ID    int               `json:"id"`
-	Nodes []int             `json:"nodes"`
-	Tags  map[string]string `json:"tags"`
+	ID      int64
+	Type    string
+	Tags    map[string]string
+	Lat     float64    // Только для node
+	Lon     float64    // Только для node
+	Nodes   []int64    // Только для way
+	Members []struct { // Только для relation
+		Type string
+		Ref  int64
+		Role string
+	} `json:"members,omitempty"`
 }
 
 // ProcessPlacesDTO представляет массив мест для обработки

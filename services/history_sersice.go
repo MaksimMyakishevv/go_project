@@ -285,45 +285,80 @@ func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]m
 	var places []map[string]string
 
 	for _, obj := range osmObjects {
-		if obj.Type == "way" {
-			//placeID := obj.ID
-			tags := obj.Tags
-			var placeName string
+		tags := obj.Tags
+		var placeName string
 
-			// Проверяем наличие поля "name" в tags
-			if name, exists := tags["name"]; exists && name != "" {
-				placeName = name
-			} else if street, exists := tags["addr:street"]; exists && street != "" {
-				// Если "name" нет, формируем name из "addr:street" и "addr:housenumber"
-				if housenumber, exists := tags["addr:housenumber"]; exists && housenumber != "" {
-					placeName = fmt.Sprintf("%s, %s", street, housenumber)
-				}
+		// 1. Формируем placeName
+		if name, exists := tags["name"]; exists && name != "" {
+			placeName = name
+		} else if street, exists := tags["addr:street"]; exists && street != "" {
+			if housenumber, exists := tags["addr:housenumber"]; exists && housenumber != "" {
+				placeName = fmt.Sprintf("%s, %s", street, housenumber)
+			} else {
+				placeName = street // Если номера дома нет, используем только улицу
 			}
-
-			// Если удалось сформировать placeName, добавляем место с дополнительными полями
-			if placeName != "" {
-				placeData := map[string]string{
-					"place_name":       placeName,
-					"addr:city":        tags["addr:city"],
-					"addr:street":      tags["addr:street"],
-					"addr:housenumber": tags["addr:housenumber"],
-					"name":             tags["name"],
+		} else {
+			// 2. Дополнительные варианты для placeName
+			switch {
+			case tags["inscription"] != "":
+				placeName = tags["inscription"]
+			case tags["description"] != "":
+				if len(tags["description"]) > 100 { // Ограничиваем длину
+					placeName = tags["description"][:100] + "..."
+				} else {
+					placeName = tags["description"]
 				}
-				places = append(places, placeData)
+			case tags["amenity"] != "":
+				placeName = fmt.Sprintf("%s %d", tags["amenity"], obj.ID)
+			case tags["tourism"] != "":
+				placeName = fmt.Sprintf("%s %d", tags["tourism"], obj.ID)
+			case tags["highway"] != "":
+				placeName = fmt.Sprintf("%s %d", tags["highway"], obj.ID)
+			case tags["leisure"] != "":
+				placeName = fmt.Sprintf("%s %d", tags["leisure"], obj.ID)
+			case tags["building"] != "":
+				placeName = fmt.Sprintf("building %d", obj.ID)
+			default:
+				placeName = fmt.Sprintf("%s %d", obj.Type, obj.ID) // Fallback
 			}
 		}
+
+		// 3. Собираем данные о месте
+		placeData := map[string]string{
+			"type":             obj.Type,
+			"place_name":       placeName,
+			"addr:city":        tags["addr:city"],
+			"addr:street":      tags["addr:street"],
+			"addr:housenumber": tags["addr:housenumber"],
+			"name":             tags["name"],
+			"amenity":          tags["amenity"],
+			"tourism":          tags["tourism"],
+			"highway":          tags["highway"],
+			"leisure":          tags["leisure"],
+			"building":         tags["building"],
+			"inscription":      tags["inscription"],
+			"description":      tags["description"],
+		}
+
+		// 4. Добавляем координаты для node
+		if obj.Type == "node" {
+			placeData["lat"] = fmt.Sprintf("%f", obj.Lat)
+			placeData["lon"] = fmt.Sprintf("%f", obj.Lon)
+		}
+
+		places = append(places, placeData)
 	}
 
-	// Обрабатываем места с помощью существующего метода
+	// 5. Передаем в ProcessPlaces (предполагаем, что он возвращает результаты)
 	results, err := s.ProcessPlaces(userID, places)
 	if err != nil {
 		return nil, err
 	}
 
-	// Дополняем результаты place_id из исходных данных
+	// 6. Добавляем place_id в успешные результаты
 	for i, result := range results {
 		if status, ok := result["status"].(string); ok && status == "success" {
-			result["place_id"] = osmObjects[i].ID
+			result["place_id"] = fmt.Sprintf("%d", osmObjects[i].ID)
 		}
 	}
 
