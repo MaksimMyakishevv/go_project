@@ -158,7 +158,7 @@ func (s *PlaceService) SendToLLM(placeData map[string]string) (string, error) {
 
 	// Декодируем JSON-ответ
 	var response struct {
-		Text string `json:"text"`
+		Text string `json:"message"`
 	}
 
 	if err := json.Unmarshal(body, &response); err != nil {
