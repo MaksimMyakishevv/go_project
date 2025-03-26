@@ -6,7 +6,7 @@ import (
 	"new/controllers"
 	"new/database"
 	docs "new/docs"
-	middleware "new/midellware"
+	middleware "new/middleware"
 	"new/services"
 
 	"github.com/gin-gonic/gin"
@@ -46,9 +46,9 @@ func main() {
 	preferenceService := &services.PreferenceService{
 		DB: database.GetDB(),
 	}
-	audioService := &services.AudioService{
-		DB: database.GetDB(),
-	}
+	// audioService := &services.AudioService{
+	// 	DB: database.GetDB(),
+	// }
 	placeService := &services.PlaceService{ // Добавляем сервис для работы с местами
 		DB: database.GetDB(),
 	}
@@ -57,7 +57,6 @@ func main() {
 	}
 	go delethistory.CleanupOldPlaces()
 	askLLMService := &services.AskLLMService{}
-	GetAddressesService := &services.GetAddressesService{}
 
 	// Инициализация контроллеров
 	regisController := &controllers.RegistController{
@@ -68,16 +67,13 @@ func main() {
 	askLLMController := &controllers.AskLLMController{
 		Service: askLLMService,
 	}
-	GetAddressesController := &controllers.GetAddressesController{
-		Service: GetAddressesService,
-	}
 
 	preferenceController := &controllers.PreferenceController{
 		Service_prefernse: preferenceService,
 	}
-	audioController := &controllers.AudioController{
-		Service: audioService,
-	}
+	// audioController := &controllers.AudioController{
+	// 	Service: audioService,
+	// }
 	placeController := &controllers.PlaceController{ // Добавляем контроллер для работы с местами
 		Service: placeService,
 	}
@@ -92,20 +88,18 @@ func main() {
 		v1.POST("/register", regisController.RegisterUser)
 		v1.POST("/login", regisController.LoginUser)
 		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
-		v1.POST("/addresses", GetAddressesController.GetAddresses)
-		v1.POST("/audio", audioController.SaveAudio)  // сохраняет путь в postgres
-		v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
-		v1.GET("/audio", audioController.GetAllAudio) //выводит пути аудио из постгреса
-		v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
-		v1.POST("/audio/generate", placeController.GenerateAudio)
+		// v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
+		// v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
+		v1.POST("/audio/generate", placeController.GenerateAudioFromText) //Генерация аудио из текста
+		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth) //Обработка массива данных без необходимости регистрироваться
 	}
 
 	// Защищённые маршруты
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/helloworld", Helloworld)
+		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
 		protected.GET("/users/history", placeController.GetUserHistory)       // Получение истории запросов пользователя

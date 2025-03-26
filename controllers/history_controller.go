@@ -48,7 +48,7 @@ func (c *PlaceController) GetUserHistory(ctx *gin.Context) {
 // @Failure      400  {object}  PlaceErrorResponse
 // @Failure      500  {object}  PlaceErrorResponse
 // @Router       /audio/generate [post]
-func (c *PlaceController) GenerateAudio(ctx *gin.Context) {
+func (c *PlaceController) GenerateAudioFromText(ctx *gin.Context) {
 	var request dto.AudioDTO
 
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -56,12 +56,12 @@ func (c *PlaceController) GenerateAudio(ctx *gin.Context) {
 		return
 	}
 
-	if request.Path == "" {
-		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Поле 'path' обязательно"})
+	if request.Message == "" {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: "Поле 'message' обязательно"})
 		return
 	}
 
-	audioData, err := c.Service.AudioGenerate(request.Path)
+	audioData, err := c.Service.AudioGenerate(request.Message)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Ошибка генерации: " + err.Error()})
 		return
@@ -165,4 +165,33 @@ func (c *PlaceController) GetCachedResponse(ctx *gin.Context) {
 
 	// Возвращаем успешный ответ
 	ctx.JSON(http.StatusOK, gin.H{"response": response})
+}
+
+// ProcessJSONNoAuth godoc
+// @Summary      Обработать JSON-файл с местами
+// @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть
+// @Tags         places
+// @Accept       json
+// @Produce      json
+// @Param        input  body      dto.ProcessPlacesDTO  true  "JSON-файл с местами"
+// @Success      200    {array}   map[string]interface{}
+// @Failure      400    {object}  PlaceErrorResponse
+// @Failure      500    {object}  PlaceErrorResponse
+// @Router       /process-json-noauth [post]
+func (c *PlaceController) ProcessJSONNoAuth(ctx *gin.Context) {
+	var input dto.ProcessPlacesDTO
+	// Проверяем и парсим тело запроса
+	if err := ctx.ShouldBindJSON(&input); err != nil {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
+		return
+	}
+	
+	// Вызываем сервис для обработки JSON-файла
+	results, err := c.Service.ProcessJSONNoAuth(input.JSONData)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
+		return
+	}
+	// Возвращаем результаты
+	ctx.JSON(http.StatusOK, results)
 }

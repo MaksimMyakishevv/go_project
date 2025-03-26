@@ -16,7 +16,3 @@ type UploadedFile struct {
 	Filename string
 	Size int64
 }
-
-type TTSRequest struct {
-	Text string `json:"text"`
-}

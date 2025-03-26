@@ -1,5 +1,5 @@
 package dto
 
 type AudioDTO struct {
-	Path    string `json:"path" binding:"required"`
+	Message    string `json:"message" binding:"required"`
 }

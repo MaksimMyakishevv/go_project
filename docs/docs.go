@@ -15,24 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/addresses": {
-            "post": {
-                "responses": {
-                    "201": {
-                        "description": "Массис отправлен",
-                        "schema": {
-                            "$ref": "#/definitions/models.Question"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input\" // Указание структуры ошибки",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/ask": {
             "post": {
                 "description": "Ввод текста, который будет передан ЛЛМ и возвращение ответа",
@@ -62,73 +44,6 @@ const docTemplate = `{
                         "description": "Вопрос ЛЛМ отправлен",
                         "schema": {
                             "$ref": "#/definitions/models.Question"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input\" // Указание структуры ошибки",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/audio": {
-            "get": {
-                "description": "Возвращает список путей аудио из БД",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TTS"
-                ],
-                "summary": "Получить все пути аудио",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Audio"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Сохраняет путь до аудиофайла",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TTS"
-                ],
-                "summary": "Сохранить Аудио в БД postgres",
-                "parameters": [
-                    {
-                        "description": "Path data",
-                        "name": "audio",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AudioDTO"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Путь сохранен в БД",
-                        "schema": {
-                            "$ref": "#/definitions/models.Audio"
                         }
                     },
                     "400": {
@@ -521,6 +436,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/process-json-noauth": {
+            "post": {
+                "description": "Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "places"
+                ],
+                "summary": "Обработать JSON-файл с местами",
+                "parameters": [
+                    {
+                        "description": "JSON-файл с местами",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProcessPlacesDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/register": {
             "post": {
                 "description": "Register a new user by providing username, password, and email",
@@ -683,10 +648,10 @@ const docTemplate = `{
         "dto.AudioDTO": {
             "type": "object",
             "required": [
-                "path"
+                "message"
             ],
             "properties": {
-                "path": {
+                "message": {
                     "type": "string"
                 }
             }
@@ -705,14 +670,10 @@ const docTemplate = `{
         "dto.InputQuestionDTO": {
             "type": "object",
             "required": [
-                "location",
-                "preferences"
+                "message"
             ],
             "properties": {
-                "location": {
-                    "type": "string"
-                },
-                "preferences": {
+                "message": {
                     "type": "string"
                 }
             }
@@ -738,7 +699,33 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "lat": {
+                    "description": "Только для node",
+                    "type": "number"
+                },
+                "lon": {
+                    "description": "Только для node",
+                    "type": "number"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "ref": {
+                                "type": "integer"
+                            },
+                            "role": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
                 "nodes": {
+                    "description": "Только для way",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -784,22 +771,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.Audio": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "description": "Время создания записи",
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "path": {
-                    "description": "Путь",
                     "type": "string"
                 }
             }
@@ -856,10 +827,7 @@ const docTemplate = `{
         "models.Question": {
             "type": "object",
             "properties": {
-                "location": {
-                    "type": "string"
-                },
-                "preferences": {
+                "message": {
                     "type": "string"
                 }
             }

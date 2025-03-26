@@ -1,15 +1,10 @@
 package services
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"new/dto"
 	"new/models"
 	"os"
 	"time"
@@ -24,20 +19,6 @@ import (
 
 type AudioService struct {
 	DB *gorm.DB
-}
-
-func (s *AudioService) SaveAudio(input dto.AudioDTO) (*models.Audio, error) {
-
-	file_path := &models.Audio{
-		Path: input.Path,
-	}
-
-	// Сохраняем в базе данных
-	if err := s.DB.Create(file_path).Error; err != nil {
-		return nil, err
-	}
-
-	return file_path, nil
 }
 
 func (s *AudioService) GetAllAudio() ([]models.Audio, error) {
@@ -126,34 +107,3 @@ func (s *AudioService) LoadFile(file models.UploadedFile, ctx context.Context) (
 	return fileURL, nil
 }
 
-// На данный момент эта функция нигде не используется, и я не проверяла работает ли вообще
-func (s *AudioService) GenerateAudio(req models.TTSRequest) ([]byte, error) {
-	// Convert the request body to JSON
-	jsonBody := new(bytes.Buffer)
-
-	err := json.NewEncoder(jsonBody).Encode(req)
-	if err != nil {
-		return nil, fmt.Errorf("error encoding JSON: %w", err)
-	}
-
-	fastapiUrl := "http://localhost:8001/generate_audio"
-	// Forward the request to FastAPI
-	resp, err := http.Post(fastapiUrl, "application/json", jsonBody)
-	if err != nil {
-		return nil, fmt.Errorf("error forwarding request to FastAPI: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("FastAPI error: %s", string(body))
-	}
-
-	// Read and return the audio data from the response body
-	audioData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading audio data: %w", err)
-	}
-
-	return audioData, nil
-}
