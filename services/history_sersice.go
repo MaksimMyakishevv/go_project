@@ -197,7 +197,7 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 	}
 
 	// Создаем контекст с тайм-аутом
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	// Создаем HTTP-запрос
