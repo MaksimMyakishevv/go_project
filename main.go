@@ -91,7 +91,7 @@ func main() {
 		// v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
 		// v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
 		v1.POST("/audio/generate", placeController.GenerateAudioFromText) //Генерация аудио из текста
-		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth) //Обработка массива данных без необходимости регистрироваться
+		// v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth) //Обработка массива данных без необходимости регистрироваться
 	}
 
 	// Защищённые маршруты

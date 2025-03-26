@@ -178,20 +178,20 @@ func (c *PlaceController) GetCachedResponse(ctx *gin.Context) {
 // @Failure      400    {object}  PlaceErrorResponse
 // @Failure      500    {object}  PlaceErrorResponse
 // @Router       /process-json-noauth [post]
-func (c *PlaceController) ProcessJSONNoAuth(ctx *gin.Context) {
-	var input dto.ProcessPlacesDTO
-	// Проверяем и парсим тело запроса
-	if err := ctx.ShouldBindJSON(&input); err != nil {
-		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
-		return
-	}
-	
-	// Вызываем сервис для обработки JSON-файла
-	results, err := c.Service.ProcessJSONNoAuth(input.JSONData)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
-		return
-	}
-	// Возвращаем результаты
-	ctx.JSON(http.StatusOK, results)
-}
+// func (c *PlaceController) ProcessJSONNoAuth(ctx *gin.Context) {
+// 	var input dto.ProcessPlacesDTO
+// 	// Проверяем и парсим тело запроса
+// 	if err := ctx.ShouldBindJSON(&input); err != nil {
+// 		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
+// 		return
+// 	}
+
+// 	// Вызываем сервис для обработки JSON-файла
+// 	results, err := c.Service.ProcessJSONNoAuth(input.JSONData)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
+// 		return
+// 	}
+// 	// Возвращаем результаты
+// 	ctx.JSON(http.StatusOK, results)
+// }
