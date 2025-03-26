@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"new/database"
@@ -148,6 +149,10 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 	if err := json.Unmarshal(body, &response); err != nil {
 		return "", fmt.Errorf("ошибка парсинга JSON: %v", err)
 	}
+	// Проверяем текст на ошибки
+	if err := checkResponseError(response.Text, "LLM"); err != nil {
+		return "", err
+	}
 
 	return response.Text, nil
 }
@@ -194,6 +199,18 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при чтении тела ответа: %v", err)
 	}
+
+	// Проверяем, является ли ответ текстом ошибки
+	var response struct {
+		Text string `json:"message"`
+	}
+	if err := json.Unmarshal(audioData, &response); err == nil {
+		// Если удалось распарсить JSON и есть поле "message", проверяем на ошибку
+		if err := checkResponseError(response.Text, "TTS"); err != nil {
+			return nil, err
+		}
+	}
+
 	if len(audioData) == 0 {
 		return nil, fmt.Errorf("пустое тело ответа")
 	}
@@ -202,30 +219,35 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 	return audioData, nil
 }
 
+// checkResponseError проверяет текст ответа на наличие ошибок и возвращает error, если ошибка найдена
+func checkResponseError(responseText string, source string) error {
+	if strings.Contains(responseText, "ОШИБКА") {
+		return fmt.Errorf("ошибка от %s: %s", source, responseText)
+	}
+	return nil
+}
+
 // ProcessPlaces обрабатывает массив мест батч-обработкой
 func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	ctx := context.Background()
 
-	// Проверяем кеш для каждого места
 	placeTexts := make(map[string]string)
 	for _, place := range places {
 		placeName := place["place_name"]
 		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
 
 		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-			// Если есть в кеше, добавляем в результат
 			placeTexts[placeName] = cachedResponse
 			results = append(results, map[string]interface{}{
 				"place_name": placeName,
 				"status":     "success",
 				"response":   cachedResponse,
-				"audio":      nil, // Аудио не возвращаем из кеша
+				"audio":      nil,
 			})
 		}
 	}
 
-	// Фильтруем места, которых нет в кеше
 	var placesToProcess []map[string]string
 	for _, place := range places {
 		placeName := place["place_name"]
@@ -234,48 +256,42 @@ func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([
 		}
 	}
 
-	// Если есть места для обработки
 	if len(placesToProcess) > 0 {
-		// Отправляем весь массив в LLM и получаем единый текст
 		text, err := s.SendBatchToLLM(placesToProcess)
 		if err != nil {
 			for _, place := range placesToProcess {
 				results = append(results, map[string]interface{}{
 					"place_name": place["place_name"],
-					"status":     "timeout or no connection",
-					"response":   nil,
+					"status":     "llm_error",
+					"response":   err.Error(),
 					"audio":      nil,
 				})
 			}
 			return results, err
 		}
 
-		// Генерируем аудио для всего текста
 		audioData, err := s.AudioGenerate(text)
 		if err != nil {
 			for _, place := range placesToProcess {
 				results = append(results, map[string]interface{}{
 					"place_name": place["place_name"],
-					"status":     "audio_generation_failed",
-					"response":   text, // Возвращаем текст, даже если аудио не удалось
+					"status":     "tts_error", // Изменяем статус для ошибок TTS
+					"response":   text,
 					"audio":      nil,
 				})
 			}
 			return results, err
 		}
 
-		// Сохраняем результаты и добавляем в историю
 		for _, place := range placesToProcess {
 			placeName := place["place_name"]
 
-			// Сохраняем в Redis (кэшируем весь текст для каждого места)
 			cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
 			expiration := 24 * time.Hour
 			if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
 				fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
 			}
 
-			// Добавляем в историю
 			_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
 			if err != nil {
 				results = append(results, map[string]interface{}{
@@ -287,12 +303,11 @@ func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([
 				continue
 			}
 
-			// Успешный результат
 			results = append(results, map[string]interface{}{
 				"place_name": placeName,
 				"status":     "success",
-				"response":   text,      // Единый текст для всех мест
-				"audio":      audioData, // Единое аудио для всех мест
+				"response":   text,
+				"audio":      audioData,
 			})
 		}
 	}
