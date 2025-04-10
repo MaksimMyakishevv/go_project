@@ -655,6 +655,61 @@ func (s *PlaceService) ProcessJSONNoAuth(osmObjects []dto.OSMObject) ([]map[stri
 	return results, nil
 }
 
+
+func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	//ctx := context.Background()
+	
+	// Заглушка: если массив пустой, возвращаем пустой результат
+	if len(places) == 0 {
+		return results, nil
+	}
+	
+	for _, place := range places {
+		
+		placeName := place["place_name"]
+		
+		// Формируем массив с одним элементом для отправки в LLM
+		placesToProcess := []map[string]string{place}
+		
+		// Отправляем запрос в LLM
+		text, err := s.SendBatchToLLM(placesToProcess)
+		if err != nil {
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "llm_error",
+				"response":   err.Error(),
+				"audio":      nil,
+			})
+			continue
+			//return results, nil //err
+		}
+		
+		// Генерируем аудио
+		audioData, err := s.AudioGenerate(text)
+		if err != nil {
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "tts_error",
+				"response":   text,
+				"audio":      nil,
+			})
+			continue
+			//return results, nil //err
+		}
+
+		// Успешный результат
+		results = append(results, map[string]interface{}{
+			"place_name": placeName,
+			"status":     "success",
+			"response":   text,
+			"audio":      audioData,
+		})
+	}
+	
+	return results, nil
+}
+
 // func (s *PlaceService) ProcessPlacesNoAuth0(places []map[string]string) ([]map[string]interface{}, error) {
 // 	var results []map[string]interface{}
 
@@ -702,55 +757,3 @@ func (s *PlaceService) ProcessJSONNoAuth(osmObjects []dto.OSMObject) ([]map[stri
 // 	// Возвращаем текст, флаг "из кеша", аудио и nil (ошибки нет)
 // 	return text, audioData, nil
 // }
-
-func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	//ctx := context.Background()
-
-	// Заглушка: если массив пустой, возвращаем пустой результат
-	if len(places) == 0 {
-		return results, nil
-	}
-
-	for _, place := range places {
-
-		placeName := place["place_name"]
-
-		// Формируем массив с одним элементом для отправки в LLM
-		placesToProcess := []map[string]string{place}
-
-		// Отправляем запрос в LLM
-		text, err := s.SendBatchToLLM(placesToProcess)
-		if err != nil {
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "llm_error",
-				"response":   err.Error(),
-				"audio":      nil,
-			})
-			return results, nil //err
-		}
-
-		// Генерируем аудио
-		audioData, err := s.AudioGenerate(text)
-		if err != nil {
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "tts_error",
-				"response":   text,
-				"audio":      nil,
-			})
-			return results, nil //err
-		}
-
-		// Успешный результат
-		results = append(results, map[string]interface{}{
-			"place_name": placeName,
-			"status":     "success",
-			"response":   text,
-			"audio":      audioData,
-		})
-	}
-
-	return results, nil
-}
