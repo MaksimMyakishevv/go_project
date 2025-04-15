@@ -256,36 +256,6 @@ paths:
       summary: Получить закешированный ответ
       tags:
       - places
-  /files:
-    get:
-      description: Возвращает список информации о файлах в бакете в ТЕРМИНАЛ
-      produces:
-      - application/json
-      responses:
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/controllers.ErrorResponse'
-      summary: Получить все файлы в бакете
-      tags:
-      - TTS
-  /helloworld:
-    get:
-      consumes:
-      - application/json
-      description: A simple example endpoint that responds with the string "helloworld"
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: helloworld
-          schema:
-            type: string
-      security:
-      - BearerAuth: []
-      summary: Returns "helloworld"
-      tags:
-      - Example
   /login:
     post:
       consumes:
@@ -492,34 +462,6 @@ paths:
       summary: Register new user
       tags:
       - auth
-  /upload:
-    post:
-      consumes:
-      - multipart/form-data
-      description: Загружает файл в Object Storage Яндекса
-      parameters:
-      - description: File to upload
-        in: formData
-        name: file
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              additionalProperties: true
-              type: object
-            type: array
-        "400":
-          description: Invalid input or upload failed
-          schema:
-            $ref: '#/definitions/controllers.ErrorResponse'
-      summary: Загрузить файл в Object Storage
-      tags:
-      - TTS
   /users/history:
     get:
       description: Возвращает список мест, связанных с пользователем

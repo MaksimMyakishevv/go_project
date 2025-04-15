@@ -1,7 +1,7 @@
 package database
 
 import (
-	"fmt"
+	//"fmt"
 	"log"
 	"new/models"
 	"os"
@@ -45,8 +45,8 @@ func InitDB() {
 		log.Fatalf("Ошибка подключения к базе данных: %v", err)
 	}
 
-	fmt.Println("Подключение к базе данных успешно установлено!") // Выводим сообщение об успешном подключении
-	err = db.AutoMigrate(&models.User{}, &models.Preference{}, &models.Place{}, &models.Audio{}, &models.ListPreference{})
+	//fmt.Println("Подключение к базе данных успешно установлено!") // Выводим сообщение об успешном подключении
+	err = db.AutoMigrate(&models.User{}, &models.Preference{}, &models.Place{}, &models.ListPreference{})
 	if err != nil {
 		log.Fatalf("Ошибка миграции: %v", err)
 	}

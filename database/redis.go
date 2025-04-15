@@ -28,5 +28,5 @@ func InitRedis() {
 		log.Fatalf("Ошибка подключения к Redis: %v", err)
 	}
 
-	log.Println("Подключение к Redis успешно установлено!")
+	//log.Println("Подключение к Redis успешно установлено!")
 }

@@ -164,54 +164,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/files": {
-            "get": {
-                "description": "Возвращает список информации о файлах в бакете в ТЕРМИНАЛ",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TTS"
-                ],
-                "summary": "Получить все файлы в бакете",
-                "responses": {
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/helloworld": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "A simple example endpoint that responds with the string \"helloworld\"",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Example"
-                ],
-                "summary": "Returns \"helloworld\"",
-                "responses": {
-                    "200": {
-                        "description": "helloworld",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/login": {
             "post": {
                 "description": "Login a user by providing email and password, and return a JWT token",
@@ -525,48 +477,6 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict - user already exists",
-                        "schema": {
-                            "$ref": "#/definitions/controllers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/upload": {
-            "post": {
-                "description": "Загружает файл в Object Storage Яндекса",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "TTS"
-                ],
-                "summary": "Загрузить файл в Object Storage",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "File to upload",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": true
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid input or upload failed",
                         "schema": {
                             "$ref": "#/definitions/controllers.ErrorResponse"
                         }

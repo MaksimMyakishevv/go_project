@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	backgroundprocesses "new/background_processes"
 	"new/controllers"
 	"new/database"
@@ -17,19 +16,6 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-
-// Helloworld godoc
-// @Summary Returns "helloworld"
-// @Description A simple example endpoint that responds with the string "helloworld"
-// @Tags Example
-// @Accept json
-// @Produce json
-// @Success 200 {string} string "helloworld"
-// @Security BearerAuth
-// @Router /helloworld [get]
-func Helloworld(c *gin.Context) {
-	c.JSON(http.StatusOK, "helloworld")
-}
 
 func main() {
 	// Инициализация подключения к базе данных
@@ -87,10 +73,8 @@ func main() {
 	{
 		v1.POST("/register", regisController.RegisterUser)
 		v1.POST("/login", regisController.LoginUser)
-		v1.POST("/ask", askLLMController.AskLLMQuestion) //Эта часть остается в открытом доступе для тестирования
-		// v1.POST("/upload", audioController.LoadFile)  //Загрузить аудио в S3
-		// v1.GET("/files", audioController.GetFiles)    //выводит в консоль файлы из бакета
-		v1.POST("/audio/generate", placeController.GenerateAudioFromText) //Генерация аудио из текста
+		v1.POST("/ask", askLLMController.AskLLMQuestion)                   //Эта часть остается в открытом доступе для тестирования
+		v1.POST("/audio/generate", placeController.GenerateAudioFromText)  //Генерация аудио из текста
 		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth) //Обработка массива данных без необходимости регистрироваться
 	}
 
@@ -98,7 +82,6 @@ func main() {
 	protected := v1.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.GET("/helloworld", Helloworld)
 		protected.POST("/preferences", preferenceController.CreatePreference)
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)

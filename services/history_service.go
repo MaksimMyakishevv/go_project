@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"new/database"
@@ -70,90 +71,56 @@ func (s *PlaceService) GetCachedResponse(userID uint, placeName string) (string,
 	return cachedResponse, nil
 }
 
-// // ProcessPlace отправляет данные о месте на обработку нейросетью с таймаутом 15 секунд
-// func (s *PlaceService) ProcessPlace(userID uint, placeData map[string]string) (string, bool, []byte, error) {
-// 	ctx := context.Background()
-
-// 	// Генерируем ключ для Redis с учетом userID и place_name
-// 	placeName := placeData["place_name"]
-// 	cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
-
-// 	// Проверяем, есть ли ответ в Redis
-// 	if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-// 		fmt.Printf("Ответ найден в кеше для пользователя %d и места: %s\n", userID, placeName)
-// 		// Если данные есть в кеше, возвращаем только текст (аудио не генерируем)
-// 		return cachedResponse, true, nil, nil
-// 	} else if err != redis.Nil {
-// 		// Если ошибка Redis не связана с отсутствием ключа, логируем её
-// 		fmt.Printf("Ошибка при получении данных из Redis: %v\n", err)
-// 		return "", false, nil, fmt.Errorf("ошибка Redis: %v", err)
-// 	}
-
-// 	// Если ответа нет в кеше, отправляем запрос к LLM
-// 	text, err := s.SendToLLM(placeData)
-// 	if err != nil {
-// 		return "", false, nil, fmt.Errorf("ошибка при отправке данных в LLM: %v", err)
-// 	}
-
-// 	// Генерируем аудио
-// 	audioData, err := s.AudioGenerate(text)
-// 	if err != nil {
-// 		return "", false, nil, fmt.Errorf("ошибка при генерации аудио: %v", err)
-// 	}
-
-// 	// Сохраняем текст в Redis
-// 	expiration := 24 * time.Hour
-// 	if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
-// 		fmt.Printf("Ошибка при сохранении данных в Redis: %v\n", err)
-// 	}
-
-// 	// Возвращаем текст, флаг "из кеша", аудио и nil (ошибки нет)
-// 	return text, false, audioData, nil
-// }
-
 // SendBatchToLLM отправляет данные одного места в LLM в формате одиночного объекта JSON
 func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Поскольку мы работаем с заглушкой, берём только первый элемент
 	if len(places) == 0 {
 		return "", fmt.Errorf("массив мест пуст")
 	}
-	place := places[0]
 
-	// Формируем JSON вручную в формате одиночного объекта
+	// Формируем JSON вручную с помощью strings.Builder
 	var jsonBuilder strings.Builder
-	jsonBuilder.WriteString("{")
+	jsonBuilder.WriteString("[")
 
-	// Поля в точном порядке, как в PlaceData
-	fields := []struct {
-		key   string
-		value string
-	}{
-		{"addr:city", place["addr:city"]},
-		{"addr:street", place["addr:street"]},
-		{"addr:housenumber", place["addr:housenumber"]},
-		{"name", place["name"]},
-		{"amenity", place["amenity"]},
-		{"tourism", place["tourism"]},
-		{"highway", place["highway"]},
-		{"leisure", place["leisure"]},
-		{"building", place["building"]},
-		{"inscription", place["inscription"]},
-		{"description", place["description"]},
+	// Поля для каждого места
+	fields := []string{
+		"addr:city",
+		"addr:street",
+		"addr:housenumber",
+		"name",
+		"amenity",
+		"tourism",
+		"highway",
+		"leisure",
+		"building",
+		"inscription",
+		"description",
+		"lat",
+		"lon",
+		"place_name",
+		"type",
 	}
 
-	for i, field := range fields {
+	for i, place := range places {
 		if i > 0 {
 			jsonBuilder.WriteString(",")
 		}
-		// Экранируем значение для JSON
-		escapedValue := strings.ReplaceAll(field.value, `"`, `\"`)
-		jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field.key, escapedValue))
+		jsonBuilder.WriteString("{")
+		for j, field := range fields {
+			if value, exists := place[field]; exists && value != "" {
+				if j > 0 {
+					jsonBuilder.WriteString(",")
+				}
+				escapedValue := strings.ReplaceAll(value, `"`, `\"`)
+				jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field, escapedValue))
+			}
+		}
+		jsonBuilder.WriteString("}")
 	}
 
-	jsonBuilder.WriteString("}")
+	jsonBuilder.WriteString("]")
 	jsonBody := jsonBuilder.String()
 
 	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", os.Getenv("HOST_LLM"), bytes.NewBufferString(jsonBody))
@@ -185,7 +152,6 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 		return "", fmt.Errorf("ошибка парсинга JSON: %v", err)
 	}
 
-	// Проверяем текст на ошибки
 	if err := checkResponseError(response.Text, "LLM"); err != nil {
 		return "", err
 	}
@@ -193,101 +159,43 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 	return response.Text, nil
 }
 
-// // SendBatchToLLM отправляет массив мест в LLM одним запросом и возвращает единый текст
-// func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error) {
-// 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-// 	defer cancel()
-
-// 	jsonBody, err := json.Marshal(places)
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при маршалинге JSON: %v", err)
-// 	}
-
-// 	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", os.Getenv("HOST_LLM"), bytes.NewBuffer(jsonBody))
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при создании запроса: %v", err)
-// 	}
-// 	req.Header.Set("Content-Type", "application/json")
-
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при отправке запроса: %v", err)
-// 	}
-// 	defer resp.Body.Close()
-
-// 	if resp.StatusCode != http.StatusOK {
-// 		return "", fmt.Errorf("ошибка: статус ответа %d", resp.StatusCode)
-// 	}
-
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при чтении тела ответа: %v", err)
-// 	}
-
-// 	var response struct {
-// 		Text string `json:"message"` // Предполагаем, что LLM возвращает текст в поле "message"
-// 	}
-// 	if err := json.Unmarshal(body, &response); err != nil {
-// 		return "", fmt.Errorf("ошибка парсинга JSON: %v", err)
-// 	}
-// 	// Проверяем текст на ошибки
-// 	if err := checkResponseError(response.Text, "LLM"); err != nil {
-// 		return "", err
-// 	}
-
-// 	return response.Text, nil
-// }
-
 // AudioGenerate отправляет текст в формате JSON и получает аудио в кодировке UTF-8
 func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
-	// Создаем HTTP-клиент
 	client := &http.Client{}
-
-	// Формируем тело запроса в формате JSON
 	reqBody := map[string]string{"message": text}
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при маршалинге JSON: %v", err)
 	}
 
-	// Создаем контекст с тайм-аутом
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Создаем HTTP-запрос
 	req, err := http.NewRequestWithContext(ctx, "POST", os.Getenv("HOST_TTS"), bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при создании запроса: %v", err)
 	}
-
-	// Устанавливаем заголовок Content-Type
 	req.Header.Set("Content-Type", "application/json")
 
-	// Отправляем запрос
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при отправке запроса: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// Проверяем статус ответа
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("ошибка: статус ответа %d", resp.StatusCode)
 	}
 
-	// Читаем тело ответа (аудио в кодировке UTF-8)
 	audioData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка при чтении тела ответа: %v", err)
 	}
 
-	// Проверяем, является ли ответ текстом ошибки
 	var response struct {
 		Text string `json:"message"`
 	}
 	if err := json.Unmarshal(audioData, &response); err == nil {
-		// Если удалось распарсить JSON и есть поле "message", проверяем на ошибку
 		if err := checkResponseError(response.Text, "TTS"); err != nil {
 			return nil, err
 		}
@@ -297,11 +205,10 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 		return nil, fmt.Errorf("пустое тело ответа")
 	}
 
-	// Возвращаем аудио
 	return audioData, nil
 }
 
-// checkResponseError проверяет текст ответа на наличие ошибок и возвращает error, если ошибка найдена
+// checkResponseError проверяет текст ответа на наличие ошибок
 func checkResponseError(responseText string, source string) error {
 	if strings.Contains(responseText, "ОШИБКА") {
 		return fmt.Errorf("ошибка от %s: %s", source, responseText)
@@ -309,259 +216,370 @@ func checkResponseError(responseText string, source string) error {
 	return nil
 }
 
-// ProcessPlaces обрабатывает массив мест батч-обработкой (заглушка: только первый элемент)
-func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+// ProcessPlaces обрабатывает массив мест последовательно
+func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) (map[string]interface{}, error) {
+	result := map[string]interface{}{
+		"places":   []map[string]interface{}{},
+		"response": nil,
+		"audio":    nil,
+		"status":   "pending",
+	}
 	ctx := context.Background()
 
-	// Заглушка: если массив пустой, возвращаем пустой результат
+	if len(places) == 0 {
+		result["status"] = "success"
+		return result, nil
+	}
+
+	// 1. Собираем информацию о местах
+	placeList := []map[string]interface{}{}
+	cacheFound := true
+
+	for _, place := range places {
+		placeName := place["place_name"]
+		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+
+		// Проверяем кеш
+		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
+			placeList = append(placeList, map[string]interface{}{
+				"place_name": placeName,
+				"details":    place,
+			})
+			result["response"] = cachedResponse
+			result["audio"] = nil // Аудио не кешируется
+		} else {
+			cacheFound = false
+			placeList = append(placeList, map[string]interface{}{
+				"place_name": placeName,
+				"details":    place,
+			})
+		}
+	}
+
+	result["places"] = placeList
+
+	// Если все места найдены в кеше, возвращаем результат
+	if cacheFound {
+		result["status"] = "success"
+		return result, nil
+	}
+
+	// 2. Отправляем весь массив в LLM
+	text, err := s.SendBatchToLLM(places)
+	if err != nil {
+		result["status"] = "llm_error"
+		result["response"] = err.Error()
+		return result, err
+	}
+
+	result["response"] = text
+
+	// 3. Генерируем аудио
+	audioData, err := s.AudioGenerate(text)
+	if err != nil {
+		result["status"] = "tts_error"
+		return result, err
+	}
+
+	result["audio"] = audioData
+	result["status"] = "success"
+
+	// 4. Сохраняем результаты в Redis и историю
+	for _, place := range places {
+		placeName := place["place_name"]
+		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+
+		// Сохраняем в Redis
+		expiration := 24 * time.Hour
+		if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
+			fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
+		}
+
+		// Добавляем в историю
+		_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
+		if err != nil {
+			fmt.Printf("Ошибка при добавлении в историю: %v\n", err)
+			continue
+		}
+	}
+
+	return result, nil
+}
+
+// ProcessPlacesGoroutines обрабатывает массив мест параллельно
+func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+	ctx := context.Background()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
 	if len(places) == 0 {
 		return results, nil
 	}
 
-	// Берем только первый элемент массива
-	place := places[0]
-	placeName := place["place_name"]
-	cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+	// Проверяем кеш для каждого места
+	for _, place := range places {
+		placeName := place["place_name"]
+		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
 
-	// Проверяем кеш для первого места
-	if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-		results = append(results, map[string]interface{}{
-			"place_name": placeName,
-			"status":     "success",
-			"response":   cachedResponse,
-			"audio":      nil,
-		})
+		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
+			mu.Lock()
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "success",
+				"response":   cachedResponse,
+				"audio":      nil,
+			})
+			mu.Unlock()
+		}
+	}
+
+	// Если все места найдены в кеше, возвращаем результаты
+	if len(results) == len(places) {
 		return results, nil
 	}
 
-	// Формируем массив с одним элементом для отправки в LLM
-	placesToProcess := []map[string]string{place}
+	// Отправляем весь массив в LLM в отдельной горутине
+	var text string
+	var llmErr error
+	llmDone := make(chan struct{}) // Канал для сигнализации завершения LLM
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(llmDone) // Сигнализируем, что LLM завершился
+		text, llmErr = s.SendBatchToLLM(places)
+	}()
 
-	// Отправляем запрос в LLM
-	text, err := s.SendBatchToLLM(placesToProcess)
-	if err != nil {
-		results = append(results, map[string]interface{}{
-			"place_name": placeName,
-			"status":     "llm_error",
-			"response":   err.Error(),
-			"audio":      nil,
-		})
-		return results, err
+	// Генерируем аудио в отдельной горутине
+	var audioData []byte
+	var ttsErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// Ждем завершения LLM через канал
+		<-llmDone
+		if llmErr != nil {
+			return
+		}
+		audioData, ttsErr = s.AudioGenerate(text)
+	}()
+
+	// Ждем завершения LLM и TTS
+	wg.Wait()
+
+	// Обрабатываем ошибки LLM
+	if llmErr != nil {
+		mu.Lock()
+		for _, place := range places {
+			placeName := place["place_name"]
+			if _, exists := findResultByPlaceName(results, placeName); exists {
+				continue
+			}
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "llm_error",
+				"response":   llmErr.Error(),
+				"audio":      nil,
+			})
+		}
+		mu.Unlock()
+		return results, llmErr
 	}
 
-	// Генерируем аудио
-	audioData, err := s.AudioGenerate(text)
-	if err != nil {
-		results = append(results, map[string]interface{}{
-			"place_name": placeName,
-			"status":     "tts_error",
-			"response":   text,
-			"audio":      nil,
-		})
-		return results, err
+	// Обрабатываем ошибки TTS
+	if ttsErr != nil {
+		mu.Lock()
+		for _, place := range places {
+			placeName := place["place_name"]
+			if _, exists := findResultByPlaceName(results, placeName); exists {
+				continue
+			}
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "tts_error",
+				"response":   text,
+				"audio":      nil,
+			})
+		}
+		mu.Unlock()
+		return results, ttsErr
 	}
 
-	// Сохраняем результат в Redis
-	expiration := 24 * time.Hour
-	if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
-		fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
+	// Сохраняем результаты для каждого места в горутинах
+	for _, place := range places {
+		placeName := place["place_name"]
+		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+
+		// Пропускаем, если уже есть в кеше
+		if _, exists := findResultByPlaceName(results, placeName); exists {
+			continue
+		}
+
+		wg.Add(1)
+		go func(placeName, cacheKey string) {
+			defer wg.Done()
+
+			// Сохраняем в Redis
+			expiration := 24 * time.Hour
+			if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
+				fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
+			}
+
+			// Добавляем в историю
+			_, err := s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				results = append(results, map[string]interface{}{
+					"place_name": placeName,
+					"status":     "failed_to_add",
+					"response":   text,
+					"audio":      audioData,
+				})
+				return
+			}
+
+			// Успешный результат
+			results = append(results, map[string]interface{}{
+				"place_name": placeName,
+				"status":     "success",
+				"response":   text,
+				"audio":      audioData,
+			})
+		}(placeName, cacheKey)
 	}
 
-	// Добавляем в историю
-	_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
-	if err != nil {
-		results = append(results, map[string]interface{}{
-			"place_name": placeName,
-			"status":     "failed_to_add",
-			"response":   text,
-			"audio":      audioData,
-		})
-		return results, err
-	}
-
-	// Успешный результат
-	results = append(results, map[string]interface{}{
-		"place_name": placeName,
-		"status":     "success",
-		"response":   text,
-		"audio":      audioData,
-	})
-
+	wg.Wait()
 	return results, nil
 }
 
-// ProcessPlaces обрабатывает массив мест батч-обработкой (тоесть полный пул обработанных данных)
-// func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
-// 	var results []map[string]interface{}
-// 	ctx := context.Background()
-
-// 	placeTexts := make(map[string]string)
-// 	for _, place := range places {
-// 		placeName := place["place_name"]
-// 		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
-
-// 		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-// 			placeTexts[placeName] = cachedResponse
-// 			results = append(results, map[string]interface{}{
-// 				"place_name": placeName,
-// 				"status":     "success",
-// 				"response":   cachedResponse,
-// 				"audio":      nil,
-// 			})
-// 		}
-// 	}
-
-// 	var placesToProcess []map[string]string
-// 	for _, place := range places {
-// 		placeName := place["place_name"]
-// 		if _, exists := placeTexts[placeName]; !exists {
-// 			placesToProcess = append(placesToProcess, place)
-// 		}
-// 	}
-
-// 	if len(placesToProcess) > 0 {
-// 		text, err := s.SendBatchToLLM(placesToProcess)
-// 		if err != nil {
-// 			for _, place := range placesToProcess {
-// 				results = append(results, map[string]interface{}{
-// 					"place_name": place["place_name"],
-// 					"status":     "llm_error",
-// 					"response":   err.Error(),
-// 					"audio":      nil,
-// 				})
-// 			}
-// 			return results, err
-// 		}
-
-// 		audioData, err := s.AudioGenerate(text)
-// 		if err != nil {
-// 			for _, place := range placesToProcess {
-// 				results = append(results, map[string]interface{}{
-// 					"place_name": place["place_name"],
-// 					"status":     "tts_error", // Изменяем статус для ошибок TTS
-// 					"response":   text,
-// 					"audio":      nil,
-// 				})
-// 			}
-// 			return results, err
-// 		}
-
-// 		for _, place := range placesToProcess {
-// 			placeName := place["place_name"]
-
-// 			cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
-// 			expiration := 24 * time.Hour
-// 			if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
-// 				fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
-// 			}
-
-// 			_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
-// 			if err != nil {
-// 				results = append(results, map[string]interface{}{
-// 					"place_name": placeName,
-// 					"status":     "failed_to_add",
-// 					"response":   text,
-// 					"audio":      audioData,
-// 				})
-// 				continue
-// 			}
-
-// 			results = append(results, map[string]interface{}{
-// 				"place_name": placeName,
-// 				"status":     "success",
-// 				"response":   text,
-// 				"audio":      audioData,
-// 			})
-// 		}
-// 	}
-
-// 	return results, nil
-// }
+// findResultByPlaceName проверяет, есть ли результат для placeName
+func findResultByPlaceName(results []map[string]interface{}, placeName string) (map[string]interface{}, bool) {
+	for _, result := range results {
+		if result["place_name"] == placeName {
+			return result, true
+		}
+	}
+	return nil, false
+}
 
 // ProcessJSON обрабатывает JSON-файл и отправляет места на обработку
-func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
-	var places []map[string]string
+func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) (map[string]interface{}, error) {
+	places := make([]map[string]string, 0)
+	placeList := make([]map[string]interface{}, 0)
 
+	// Формируем список мест
 	for _, obj := range osmObjects {
-		tags := obj.Tags
-		var placeName string
-
-		// 1. Формируем placeName
-		if name, exists := tags["name"]; exists && name != "" {
-			placeName = name
-		} else if street, exists := tags["addr:street"]; exists && street != "" {
-			if housenumber, exists := tags["addr:housenumber"]; exists && housenumber != "" {
-				placeName = fmt.Sprintf("%s, %s", street, housenumber)
-			} else {
-				placeName = street // Если номера дома нет, используем только улицу
-			}
-		} else {
-			// 2. Дополнительные варианты для placeName
-			switch {
-			case tags["inscription"] != "":
-				placeName = tags["inscription"]
-			case tags["description"] != "":
-				if len(tags["description"]) > 100 { // Ограничиваем длину
-					placeName = tags["description"][:100] + "..."
-				} else {
-					placeName = tags["description"]
-				}
-			case tags["amenity"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["amenity"], obj.ID)
-			case tags["tourism"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["tourism"], obj.ID)
-			case tags["highway"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["highway"], obj.ID)
-			case tags["leisure"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["leisure"], obj.ID)
-			case tags["building"] != "":
-				placeName = fmt.Sprintf("building %d", obj.ID)
-			default:
-				placeName = fmt.Sprintf("%s %d", obj.Type, obj.ID) // Fallback
-			}
+		// Пропускаем пустые места
+		if isPlaceEmpty(obj.Tags) {
+			continue
 		}
 
-		// 3. Собираем данные о месте
-		placeData := map[string]string{
-			"type":             obj.Type,
-			"place_name":       placeName,
-			"addr:city":        tags["addr:city"],
-			"addr:street":      tags["addr:street"],
-			"addr:housenumber": tags["addr:housenumber"],
-			"name":             tags["name"],
-			"amenity":          tags["amenity"],
-			"tourism":          tags["tourism"],
-			"highway":          tags["highway"],
-			"leisure":          tags["leisure"],
-			"building":         tags["building"],
-			"inscription":      tags["inscription"],
-			"description":      tags["description"],
-		}
+		// Формируем выходное представление
+		placeOutput := buildPlaceOutput(obj)
+		placeList = append(placeList, placeOutput)
 
-		// 4. Добавляем координаты для node
-		if obj.Type == "node" {
-			placeData["lat"] = fmt.Sprintf("%f", obj.Lat)
-			placeData["lon"] = fmt.Sprintf("%f", obj.Lon)
-		}
-
+		// Формируем данные для ProcessPlaces
+		placeData := buildPlaceData(obj)
 		places = append(places, placeData)
 	}
 
-	// 5. Передаем в ProcessPlaces (предполагаем, что он возвращает результаты)
-	results, err := s.ProcessPlaces(userID, places)
+	// Инициализируем результат
+	result := map[string]interface{}{
+		"places":   placeList,
+		"response": nil,
+		"audio":    nil,
+		"status":   "pending",
+	}
+
+	// Если нет мест, возвращаем пустой результат
+	if len(places) == 0 {
+		result["status"] = "success"
+		return result, nil
+	}
+
+	// Обрабатываем места
+	procResult, err := s.ProcessPlaces(userID, places)
 	if err != nil {
-		return nil, err
+		result["response"] = err.Error()
+		result["status"] = procResult["status"]
+		return result, err
 	}
 
-	// 6. Добавляем place_id в успешные результаты
-	for i, result := range results {
-		if status, ok := result["status"].(string); ok && status == "success" {
-			result["place_id"] = fmt.Sprintf("%d", osmObjects[i].ID)
-		}
+	// Обновляем результат
+	result["response"] = procResult["response"]
+	result["audio"] = procResult["audio"]
+	result["status"] = procResult["status"]
+
+	return result, nil
+}
+
+// buildPlaceName формирует название места
+func buildPlaceName(tags map[string]string, objType string, objID int64) string {
+	if name, exists := tags["name"]; exists && name != "" {
+		return name
+	}
+	return fmt.Sprintf("%s %d", objType, objID)
+}
+
+// isPlaceEmpty проверяет, является ли место пустым
+func isPlaceEmpty(tags map[string]string) bool {
+	return tags["addr:street"] == "" &&
+		tags["addr:housenumber"] == "" &&
+		tags["addr:city"] == "" &&
+		tags["name"] == ""
+}
+
+// buildPlaceData формирует данные для ProcessPlaces
+func buildPlaceData(obj dto.OSMObject) map[string]string {
+	tags := obj.Tags
+	placeData := map[string]string{
+		"type":             obj.Type,
+		"place_name":       buildPlaceName(tags, obj.Type, obj.ID),
+		"addr:city":        tags["addr:city"],
+		"addr:street":      tags["addr:street"],
+		"addr:housenumber": tags["addr:housenumber"],
+		"name":             tags["name"],
+	}
+	if obj.Lat != 0 && obj.Lon != 0 {
+		placeData["lat"] = fmt.Sprintf("%f", obj.Lat)
+		placeData["lon"] = fmt.Sprintf("%f", obj.Lon)
+	}
+	return placeData
+}
+
+// buildPlaceOutput формирует выходное представление места
+func buildPlaceOutput(obj dto.OSMObject) map[string]interface{} {
+	tags := obj.Tags
+	placeData := map[string]interface{}{
+		"place_name": buildPlaceName(tags, obj.Type, obj.ID),
+		"address":    "",
+		"city":       tags["addr:city"],
+		"place_id":   fmt.Sprintf("%d", obj.ID),
 	}
 
-	return results, nil
+	// Формируем address
+	var addressParts []string
+	if street := tags["addr:street"]; street != "" {
+		addressParts = append(addressParts, street)
+	}
+	if housenumber := tags["addr:housenumber"]; housenumber != "" {
+		addressParts = append(addressParts, housenumber)
+	}
+	placeData["address"] = strings.Join(addressParts, ", ")
+
+	// Добавляем nodes
+	if obj.Nodes != nil && len(obj.Nodes) > 0 {
+		placeData["nodes"] = obj.Nodes
+	}
+
+	// Добавляем координаты
+	if obj.Lat != 0 && obj.Lon != 0 {
+		placeData["lat"] = obj.Lat
+		placeData["lon"] = obj.Lon
+	}
+
+	return placeData
 }
 
 //
@@ -569,7 +587,6 @@ func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]m
 /*		НИЖЕ ВЕРСИЯ БЕЗ АУТЕНТИФИКАЦИИ      */
 //
 //
-
 
 func (s *PlaceService) ProcessJSONNoAuth(osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
 	var places []map[string]string
@@ -655,23 +672,22 @@ func (s *PlaceService) ProcessJSONNoAuth(osmObjects []dto.OSMObject) ([]map[stri
 	return results, nil
 }
 
-
 func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	//ctx := context.Background()
-	
+
 	// Заглушка: если массив пустой, возвращаем пустой результат
 	if len(places) == 0 {
 		return results, nil
 	}
-	
+
 	for _, place := range places {
-		
+
 		placeName := place["place_name"]
-		
+
 		// Формируем массив с одним элементом для отправки в LLM
 		placesToProcess := []map[string]string{place}
-		
+
 		// Отправляем запрос в LLM
 		text, err := s.SendBatchToLLM(placesToProcess)
 		if err != nil {
@@ -684,7 +700,7 @@ func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[st
 			continue
 			//return results, nil //err
 		}
-		
+
 		// Генерируем аудио
 		audioData, err := s.AudioGenerate(text)
 		if err != nil {
@@ -706,54 +722,6 @@ func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[st
 			"audio":      audioData,
 		})
 	}
-	
+
 	return results, nil
 }
-
-// func (s *PlaceService) ProcessPlacesNoAuth0(places []map[string]string) ([]map[string]interface{}, error) {
-// 	var results []map[string]interface{}
-
-// 	for _, place := range places {
-// 		// Отправляем запрос на нейросеть с таймаутом 15 секунд
-// 		text, audioData, err := s.ProcessPlaceNoAuth(place)
-// 		if err != nil {
-// 			fmt.Println(err)
-// 			// Если произошла ошибка, добавляем результат с ошибкой
-// 			results = append(results, map[string]interface{}{
-// 				"place_name": place["place_name"],
-// 				"status":     "timeout or no connection",
-// 				"response":   nil,
-// 				"audio":      nil,
-// 			})
-// 			continue
-// 		}
-
-// 		// Сохраняем успешный результат
-// 		results = append(results, map[string]interface{}{
-// 			"place_name": place["place_name"],
-// 			"status":     "success",
-// 			"response":   text,      // Текстовый ответ
-// 			"audio":      audioData, // Аудио в кодировке UTF-8
-// 		})
-// 	}
-
-// 	return results, nil
-// }
-
-// func (s *PlaceService) ProcessPlaceNoAuth(placeData map[string]string) (string, []byte, error) {
-
-// 	// Если ответа нет в кеше, отправляем запрос к LLM
-// 	text, err := s.SendToLLM(placeData)
-// 	if err != nil {
-// 		return "", nil, fmt.Errorf("ошибка при отправке данных в LLM: %v", err)
-// 	}
-
-// 	// Генерируем аудио
-// 	audioData, err := s.AudioGenerate(text)
-// 	if err != nil {
-// 		return "", nil, fmt.Errorf("ошибка при генерации аудио: %v", err)
-// 	}
-
-// 	// Возвращаем текст, флаг "из кеша", аудио и nil (ошибки нет)
-// 	return text, audioData, nil
-// }
