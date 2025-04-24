@@ -80,11 +80,14 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 		return "", fmt.Errorf("массив мест пуст")
 	}
 
+	// Берем только первое место, так как ожидается один объект
+	place := places[0]
+
 	// Формируем JSON вручную с помощью strings.Builder
 	var jsonBuilder strings.Builder
-	jsonBuilder.WriteString("[")
+	jsonBuilder.WriteString("{") // Начинаем с объекта
 
-	// Поля для каждого места
+	// Поля для места
 	fields := []string{
 		"addr:city",
 		"addr:street",
@@ -103,24 +106,19 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 		"type",
 	}
 
-	for i, place := range places {
-		if i > 0 {
-			jsonBuilder.WriteString(",")
-		}
-		jsonBuilder.WriteString("{")
-		for j, field := range fields {
-			if value, exists := place[field]; exists && value != "" {
-				if j > 0 {
-					jsonBuilder.WriteString(",")
-				}
-				escapedValue := strings.ReplaceAll(value, `"`, `\"`)
-				jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field, escapedValue))
+	firstField := true // Флаг для отслеживания первого добавленного поля
+	for _, field := range fields {
+		if value, exists := place[field]; exists && value != "" {
+			if !firstField {
+				jsonBuilder.WriteString(",")
 			}
+			escapedValue := strings.ReplaceAll(value, `"`, `\"`)
+			jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field, escapedValue))
+			firstField = false // После добавления первого поля сбрасываем флаг
 		}
-		jsonBuilder.WriteString("}")
 	}
 
-	jsonBuilder.WriteString("]")
+	jsonBuilder.WriteString("}") // Закрываем объект
 	jsonBody := jsonBuilder.String()
 
 	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", os.Getenv("HOST_LLM"), bytes.NewBufferString(jsonBody))
@@ -216,97 +214,91 @@ func checkResponseError(responseText string, source string) error {
 	return nil
 }
 
-// ProcessPlaces обрабатывает массив мест последовательно
-func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) (map[string]interface{}, error) {
-	result := map[string]interface{}{
-		"places":   []map[string]interface{}{},
-		"response": nil,
-		"audio":    nil,
-		"status":   "pending",
-	}
+// ProcessPlaces обрабатывает массив мест последовательно, возвращая массив с полной информацией о каждом месте
+func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
+	var result []map[string]interface{}
 	ctx := context.Background()
 
 	if len(places) == 0 {
-		result["status"] = "success"
 		return result, nil
 	}
 
-	// 1. Собираем информацию о местах
-	placeList := []map[string]interface{}{}
-	cacheFound := true
-
+	// Обрабатываем каждое место по очереди
 	for _, place := range places {
 		placeName := place["place_name"]
 		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+
+		// Инициализируем объект для текущего места
+		placeResult := map[string]interface{}{
+			"place_name": placeName,
+			"details":    place, // Сохраняем исходные данные места
+			"status":     "pending",
+		}
 
 		// Проверяем кеш
-		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-			placeList = append(placeList, map[string]interface{}{
-				"place_name": placeName,
-				"details":    place,
-			})
-			result["response"] = cachedResponse
-			result["audio"] = nil // Аудио не кешируется
+		cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result()
+		if err == redis.Nil {
+			// Если нет в кеше, отправляем в LLM индивидуально
+			placeToProcess := []map[string]string{place} // Массив из одного объекта
+			text, llmErr := s.SendBatchToLLM(placeToProcess)
+			if llmErr != nil {
+				placeResult["response"] = fmt.Sprintf("Ошибка LLM: %v", llmErr)
+				placeResult["audio"] = nil
+				placeResult["status"] = "llm_error"
+				result = append(result, placeResult)
+				continue
+			}
+
+			// Генерируем аудио для этого конкретного ответа
+			audioData, ttsErr := s.AudioGenerate(text)
+			if ttsErr != nil {
+				placeResult["response"] = text
+				placeResult["audio"] = fmt.Sprintf("Ошибка TTS: %v", ttsErr)
+				placeResult["status"] = "tts_error"
+				result = append(result, placeResult)
+				continue
+			}
+
+			// Сохраняем в кеш
+			expiration := 24 * time.Hour
+			if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
+				fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
+			}
+
+			// Добавляем в историю
+			_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
+			if err != nil {
+				fmt.Printf("Ошибка при добавлении в историю: %v\n", err)
+				placeResult["response"] = text
+				placeResult["audio"] = audioData
+				placeResult["status"] = "failed_to_add"
+				result = append(result, placeResult)
+				continue
+			}
+
+			// Успешный результат
+			placeResult["response"] = text
+			placeResult["audio"] = audioData
+			placeResult["status"] = "success"
+		} else if err != nil {
+			fmt.Printf("Ошибка при получении из Redis: %v\n", err)
+			placeResult["response"] = fmt.Sprintf("Ошибка Redis: %v", err)
+			placeResult["audio"] = nil
+			placeResult["status"] = "cache_error"
 		} else {
-			cacheFound = false
-			placeList = append(placeList, map[string]interface{}{
-				"place_name": placeName,
-				"details":    place,
-			})
-		}
-	}
-
-	result["places"] = placeList
-
-	// Если все места найдены в кеше, возвращаем результат
-	if cacheFound {
-		result["status"] = "success"
-		return result, nil
-	}
-
-	// 2. Отправляем весь массив в LLM
-	text, err := s.SendBatchToLLM(places)
-	if err != nil {
-		result["status"] = "llm_error"
-		result["response"] = err.Error()
-		return result, err
-	}
-
-	result["response"] = text
-
-	// 3. Генерируем аудио
-	audioData, err := s.AudioGenerate(text)
-	if err != nil {
-		result["status"] = "tts_error"
-		return result, err
-	}
-
-	result["audio"] = audioData
-	result["status"] = "success"
-
-	// 4. Сохраняем результаты в Redis и историю
-	for _, place := range places {
-		placeName := place["place_name"]
-		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
-
-		// Сохраняем в Redis
-		expiration := 24 * time.Hour
-		if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
-			fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
+			// Если найдено в кеше
+			placeResult["response"] = cachedResponse
+			placeResult["audio"] = nil // Аудио не кэшируется
+			placeResult["status"] = "success"
 		}
 
-		// Добавляем в историю
-		_, err = s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
-		if err != nil {
-			fmt.Printf("Ошибка при добавлении в историю: %v\n", err)
-			continue
-		}
+		result = append(result, placeResult)
 	}
 
 	return result, nil
 }
 
-// ProcessPlacesGoroutines обрабатывает массив мест параллельно
+// ProcessPlacesGoroutines обрабатывает массив мест параллельно с оптимизацией
 func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	ctx := context.Background()
@@ -317,136 +309,92 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 		return results, nil
 	}
 
-	// Проверяем кеш для каждого места
-	for _, place := range places {
+	results = make([]map[string]interface{}, len(places))
+	semaphore := make(chan struct{}, 5) // Ограничиваем до 5 параллельных запросов
+
+	// Обрабатываем каждое место
+	for i, place := range places {
 		placeName := place["place_name"]
 		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
 
+		// Инициализируем объект результата
+		placeResult := map[string]interface{}{
+			"place_name": placeName,
+			"details":    place,
+			"status":     "pending",
+		}
+
+		// Проверяем кеш заранее
 		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
-			mu.Lock()
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "success",
-				"response":   cachedResponse,
-				"audio":      nil,
-			})
-			mu.Unlock()
-		}
-	}
-
-	// Если все места найдены в кеше, возвращаем результаты
-	if len(results) == len(places) {
-		return results, nil
-	}
-
-	// Отправляем весь массив в LLM в отдельной горутине
-	var text string
-	var llmErr error
-	llmDone := make(chan struct{}) // Канал для сигнализации завершения LLM
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer close(llmDone) // Сигнализируем, что LLM завершился
-		text, llmErr = s.SendBatchToLLM(places)
-	}()
-
-	// Генерируем аудио в отдельной горутине
-	var audioData []byte
-	var ttsErr error
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Ждем завершения LLM через канал
-		<-llmDone
-		if llmErr != nil {
-			return
-		}
-		audioData, ttsErr = s.AudioGenerate(text)
-	}()
-
-	// Ждем завершения LLM и TTS
-	wg.Wait()
-
-	// Обрабатываем ошибки LLM
-	if llmErr != nil {
-		mu.Lock()
-		for _, place := range places {
-			placeName := place["place_name"]
-			if _, exists := findResultByPlaceName(results, placeName); exists {
-				continue
-			}
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "llm_error",
-				"response":   llmErr.Error(),
-				"audio":      nil,
-			})
-		}
-		mu.Unlock()
-		return results, llmErr
-	}
-
-	// Обрабатываем ошибки TTS
-	if ttsErr != nil {
-		mu.Lock()
-		for _, place := range places {
-			placeName := place["place_name"]
-			if _, exists := findResultByPlaceName(results, placeName); exists {
-				continue
-			}
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "tts_error",
-				"response":   text,
-				"audio":      nil,
-			})
-		}
-		mu.Unlock()
-		return results, ttsErr
-	}
-
-	// Сохраняем результаты для каждого места в горутинах
-	for _, place := range places {
-		placeName := place["place_name"]
-		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
-
-		// Пропускаем, если уже есть в кеше
-		if _, exists := findResultByPlaceName(results, placeName); exists {
+			placeResult["response"] = cachedResponse
+			placeResult["audio"] = nil
+			placeResult["status"] = "success"
+			results[i] = placeResult
 			continue
 		}
 
+		// Если нет в кеше, обрабатываем в горутине
 		wg.Add(1)
-		go func(placeName, cacheKey string) {
+		semaphore <- struct{}{} // Захватываем слот в семафоре
+		go func(idx int, place map[string]string) {
 			defer wg.Done()
+			defer func() { <-semaphore }() // Освобождаем слот
 
-			// Сохраняем в Redis
+			placeName := place["place_name"]
+			cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
+			placeResult := map[string]interface{}{
+				"place_name": placeName,
+				"details":    place,
+				"status":     "pending",
+			}
+
+			placeToProcess := []map[string]string{place}
+			text, llmErr := s.SendBatchToLLM(placeToProcess)
+			if llmErr != nil {
+				placeResult["response"] = fmt.Sprintf("Ошибка LLM: %v", llmErr)
+				placeResult["audio"] = nil
+				placeResult["status"] = "llm_error"
+				mu.Lock()
+				results[idx] = placeResult
+				mu.Unlock()
+				return
+			}
+
+			audioData, ttsErr := s.AudioGenerate(text)
+			if ttsErr != nil {
+				placeResult["response"] = text
+				placeResult["audio"] = fmt.Sprintf("Ошибка TTS: %v", ttsErr)
+				placeResult["status"] = "tts_error"
+				mu.Lock()
+				results[idx] = placeResult
+				mu.Unlock()
+				return
+			}
+
 			expiration := 24 * time.Hour
 			if err := database.RedisClient.Set(ctx, cacheKey, text, expiration).Err(); err != nil {
 				fmt.Printf("Ошибка при сохранении в Redis: %v\n", err)
 			}
 
-			// Добавляем в историю
 			_, err := s.AddPlace(userID, dto.AddPlaceDTO{PlaceName: placeName})
-			mu.Lock()
-			defer mu.Unlock()
 			if err != nil {
-				results = append(results, map[string]interface{}{
-					"place_name": placeName,
-					"status":     "failed_to_add",
-					"response":   text,
-					"audio":      audioData,
-				})
+				fmt.Printf("Ошибка при добавлении в историю: %v\n", err)
+				placeResult["response"] = text
+				placeResult["audio"] = audioData
+				placeResult["status"] = "failed_to_add"
+				mu.Lock()
+				results[idx] = placeResult
+				mu.Unlock()
 				return
 			}
 
-			// Успешный результат
-			results = append(results, map[string]interface{}{
-				"place_name": placeName,
-				"status":     "success",
-				"response":   text,
-				"audio":      audioData,
-			})
-		}(placeName, cacheKey)
+			placeResult["response"] = text
+			placeResult["audio"] = audioData
+			placeResult["status"] = "success"
+			mu.Lock()
+			results[idx] = placeResult
+			mu.Unlock()
+		}(i, place)
 	}
 
 	wg.Wait()
@@ -464,9 +412,8 @@ func findResultByPlaceName(results []map[string]interface{}, placeName string) (
 }
 
 // ProcessJSON обрабатывает JSON-файл и отправляет места на обработку
-func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) (map[string]interface{}, error) {
+func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
 	places := make([]map[string]string, 0)
-	placeList := make([]map[string]interface{}, 0)
 
 	// Формируем список мест
 	for _, obj := range osmObjects {
@@ -475,43 +422,30 @@ func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) (map
 			continue
 		}
 
-		// Формируем выходное представление
-		placeOutput := buildPlaceOutput(obj)
-		placeList = append(placeList, placeOutput)
-
 		// Формируем данные для ProcessPlaces
 		placeData := buildPlaceData(obj)
 		places = append(places, placeData)
 	}
 
-	// Инициализируем результат
-	result := map[string]interface{}{
-		"places":   placeList,
-		"response": nil,
-		"audio":    nil,
-		"status":   "pending",
-	}
-
-	// Если нет мест, возвращаем пустой результат
-	if len(places) == 0 {
-		result["status"] = "success"
-		return result, nil
-	}
-
 	// Обрабатываем места
-	procResult, err := s.ProcessPlaces(userID, places)
+	results, err := s.ProcessPlaces(userID, places)
 	if err != nil {
-		result["response"] = err.Error()
-		result["status"] = procResult["status"]
-		return result, err
+		return results, err
 	}
 
-	// Обновляем результат
-	result["response"] = procResult["response"]
-	result["audio"] = procResult["audio"]
-	result["status"] = procResult["status"]
+	// Обновляем результаты, добавляя полную информацию о местах
+	for i, result := range results {
+		place := osmObjects[i]
+		placeOutput := buildPlaceOutput(place)
+		// Копируем все поля из placeOutput в result
+		for k, v := range placeOutput {
+			result[k] = v
+		}
+		// Удаляем временное поле details, если оно больше не нужно
+		delete(result, "details")
+	}
 
-	return result, nil
+	return results, nil
 }
 
 // buildPlaceName формирует название места

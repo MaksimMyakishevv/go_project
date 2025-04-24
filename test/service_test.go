@@ -25,30 +25,23 @@ func generatePlaces(count int, offset int) []map[string]string {
 }
 
 func BenchmarkProcessPlaces(b *testing.B) {
-	// Инициализируем PostgreSQL
 	database.InitDB()
-	// Инициализируем Redis
 	database.InitRedis()
 
-	// Проверяем, что БД инициализирована
 	db := database.GetDB()
 	if db == nil {
 		b.Fatal("database.GetDB() returned nil")
 	}
 
-	// Проверяем подключение к Redis
 	ctx := context.Background()
 	if _, err := database.RedisClient.Ping(ctx).Result(); err != nil {
 		b.Fatal("Redis not connected: ", err)
 	}
 
-	// Создаем сервис
 	service := services.NewPlaceService(db)
-
 	userID := uint(1)
-	places := generatePlaces(10, 0) // 50 мест, Test Place 1–50
+	places := generatePlaces(50, 0) // 50 мест, Test Place 1–50
 
-	// Проверяем переменные окружения
 	if os.Getenv("HOST_LLM") == "" || os.Getenv("HOST_TTS") == "" {
 		b.Fatal("HOST_LLM or HOST_TTS not set")
 	}
@@ -56,38 +49,34 @@ func BenchmarkProcessPlaces(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := service.ProcessPlaces(userID, places)
+		results, err := service.ProcessPlaces(userID, places)
 		if err != nil {
 			b.Fatalf("error in benchmark: %v", err)
+		}
+		if len(results) != 50 {
+			b.Fatalf("expected 50 results, got %d", len(results))
 		}
 	}
 }
 
 func BenchmarkProcessPlacesGoroutines(b *testing.B) {
-	// Инициализируем PostgreSQL
 	database.InitDB()
-	// Инициализируем Redis
 	database.InitRedis()
 
-	// Проверяем, что БД инициализирована
 	db := database.GetDB()
 	if db == nil {
 		b.Fatal("database.GetDB() returned nil")
 	}
 
-	// Проверяем подключение к Redis
 	ctx := context.Background()
 	if _, err := database.RedisClient.Ping(ctx).Result(); err != nil {
 		b.Fatal("Redis not connected: ", err)
 	}
 
-	// Создаем сервис
 	service := services.NewPlaceService(db)
-
 	userID := uint(1)
-	places := generatePlaces(10, 10) // 50 мест, Test Place 51–100
+	places := generatePlaces(50, 50) // 50 мест, Test Place 11–60
 
-	// Проверяем переменные окружения
 	if os.Getenv("HOST_LLM") == "" || os.Getenv("HOST_TTS") == "" {
 		b.Fatal("HOST_LLM or HOST_TTS not set")
 	}
@@ -95,9 +84,12 @@ func BenchmarkProcessPlacesGoroutines(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, err := service.ProcessPlacesGoroutines(userID, places)
+		results, err := service.ProcessPlacesGoroutines(userID, places)
 		if err != nil {
 			b.Fatalf("error in benchmark: %v", err)
+		}
+		if len(results) != 50 {
+			b.Fatalf("expected 50 results, got %d", len(results))
 		}
 	}
 }
