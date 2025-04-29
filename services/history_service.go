@@ -428,7 +428,7 @@ func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]m
 	}
 
 	// Обрабатываем места
-	results, err := s.ProcessPlaces(userID, places)
+	results, err := s.ProcessPlacesGoroutines(userID, places)
 	if err != nil {
 		return results, err
 	}
