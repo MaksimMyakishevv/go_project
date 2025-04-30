@@ -76,6 +76,7 @@ func main() {
 		v1.POST("/ask", askLLMController.AskLLMQuestion)                   //Эта часть остается в открытом доступе для тестирования
 		v1.POST("/audio/generate", placeController.GenerateAudioFromText)  //Генерация аудио из текста
 		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth) //Обработка массива данных без необходимости регистрироваться
+		v1.POST("/process-json-mistral", placeController.ProcessJSONMistral) //Реальная ЛЛМ Mistral
 	}
 
 	// Защищённые маршруты

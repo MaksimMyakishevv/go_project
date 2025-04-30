@@ -399,11 +399,44 @@ paths:
       summary: Обработать JSON-файл с местами
       tags:
       - places
+  /process-json-mistral:
+    post:
+      consumes:
+      - application/json
+      description: Обрабатывает JSON-файл с объектами мест и отправляет их на Mistral
+      parameters:
+      - description: JSON-файл с местами
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ProcessPlacesDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.PlaceErrorResponse'
+      summary: Обработать JSON-файл с местами
+      tags:
+      - places
   /process-json-noauth:
     post:
       consumes:
       - application/json
-      description: Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть
+      description: Обрабатывает JSON-файл с объектами мест и отправляет их на заглушку
       parameters:
       - description: JSON-файл с местами
         in: body
