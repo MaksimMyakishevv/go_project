@@ -169,7 +169,7 @@ func (c *PlaceController) GetCachedResponse(ctx *gin.Context) {
 
 // ProcessJSONNoAuth godoc
 // @Summary      Обработать JSON-файл с местами
-// @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть
+// @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на заглушку
 // @Tags         places
 // @Accept       json
 // @Produce      json
@@ -188,6 +188,35 @@ func (c *PlaceController) ProcessJSONNoAuth(ctx *gin.Context) {
 
 	// Вызываем сервис для обработки JSON-файла
 	results, err := c.Service.ProcessJSONNoAuth(input.JSONData)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
+		return
+	}
+	// Возвращаем результаты
+	ctx.JSON(http.StatusOK, results)
+}
+
+// ProcessJSONMistral godoc
+// @Summary      Обработать JSON-файл с местами
+// @Description  Обрабатывает JSON-файл с объектами мест и отправляет их на Mistral
+// @Tags         places
+// @Accept       json
+// @Produce      json
+// @Param        input  body      dto.ProcessPlacesDTO  true  "JSON-файл с местами"
+// @Success      200    {array}   map[string]interface{}
+// @Failure      400    {object}  PlaceErrorResponse
+// @Failure      500    {object}  PlaceErrorResponse
+// @Router       /process-json-mistral [post]
+func (c *PlaceController) ProcessJSONMistral(ctx *gin.Context) {
+	var input dto.ProcessPlacesDTO
+	// Проверяем и парсим тело запроса
+	if err := ctx.ShouldBindJSON(&input); err != nil {
+		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Вызываем сервис для обработки JSON-файла
+	results, err := c.Service.ProcessJSONMistral(input.JSONData)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
 		return

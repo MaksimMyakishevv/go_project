@@ -377,9 +377,59 @@
                 }
             }
         },
+        "/process-json-mistral": {
+            "post": {
+                "description": "Обрабатывает JSON-файл с объектами мест и отправляет их на Mistral",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "places"
+                ],
+                "summary": "Обработать JSON-файл с местами",
+                "parameters": [
+                    {
+                        "description": "JSON-файл с местами",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ProcessPlacesDTO"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.PlaceErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/process-json-noauth": {
             "post": {
-                "description": "Обрабатывает JSON-файл с объектами мест и отправляет их на нейросеть",
+                "description": "Обрабатывает JSON-файл с объектами мест и отправляет их на заглушку",
                 "consumes": [
                     "application/json"
                 ],
