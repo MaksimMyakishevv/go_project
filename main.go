@@ -70,9 +70,6 @@ func main() {
 	{
 		v1.POST("/register", regisController.RegisterUser)
 		v1.POST("/login", regisController.LoginUser)
-		v1.POST("/ask", askLLMController.AskLLMQuestion)
-		v1.POST("/audio/generate", placeController.GenerateAudioFromText)
-		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth)
 		v1.POST("/ask", askLLMController.AskLLMQuestion)                     //Эта часть остается в открытом доступе для тестирования
 		v1.POST("/audio/generate", placeController.GenerateAudioFromText)    //Генерация аудио из текста
 		v1.POST("/process-json-noauth", placeController.ProcessJSONNoAuth)   //Обработка массива данных без необходимости регистрироваться
