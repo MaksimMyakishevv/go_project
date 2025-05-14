@@ -100,10 +100,6 @@ func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error
 		"building",
 		"inscription",
 		"description",
-		"lat",
-		"lon",
-		"place_name",
-		"type",
 	}
 
 	firstField := true // Флаг для отслеживания первого добавленного поля
@@ -198,7 +194,7 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 			return nil, err
 		}
 	}
-	
+
 	if len(audioData) == 0 {
 		return nil, fmt.Errorf("пустое тело ответа")
 	}
@@ -444,7 +440,7 @@ func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]m
 		// Удаляем временное поле details, если оно больше не нужно
 		delete(result, "details")
 	}
-	
+
 	return results, nil
 }
 
@@ -522,87 +518,44 @@ func buildPlaceOutput(obj dto.OSMObject) map[string]interface{} {
 //
 //
 
+// ProcessJSONNoAuth обрабатывает JSON-файл и отправляет места на обработку без аутентификации
 func (s *PlaceService) ProcessJSONNoAuth(osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
-	var places []map[string]string
-	
+	places := make([]map[string]string, 0)
+
+	// Формируем список мест
 	for _, obj := range osmObjects {
-		tags := obj.Tags
-		var placeName string
-		
-		// 1. Формируем placeName
-		if name, exists := tags["name"]; exists && name != "" {
-			placeName = name
-			} else if street, exists := tags["addr:street"]; exists && street != "" {
-				if housenumber, exists := tags["addr:housenumber"]; exists && housenumber != "" {
-					placeName = fmt.Sprintf("%s, %s", street, housenumber)
-					} else {
-						placeName = street // Если номера дома нет, используем только улицу
-					}
-					} else {
-						// 2. Дополнительные варианты для placeName
-						switch {
-						case tags["inscription"] != "":
-							placeName = tags["inscription"]
-						case tags["description"] != "":
-							if len(tags["description"]) > 100 { // Ограничиваем длину
-								placeName = tags["description"][:100] + "..."
-								} else {
-									placeName = tags["description"]
-								}
-							case tags["amenity"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["amenity"], obj.ID)
-			case tags["tourism"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["tourism"], obj.ID)
-			case tags["highway"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["highway"], obj.ID)
-			case tags["leisure"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["leisure"], obj.ID)
-			case tags["building"] != "":
-				placeName = fmt.Sprintf("building %d", obj.ID)
-			default:
-				placeName = fmt.Sprintf("%s %d", obj.Type, obj.ID) // Fallback
-			}
+		// Пропускаем пустые места
+		if isPlaceEmpty(obj.Tags) {
+			continue
 		}
-		
-		// 3. Собираем данные о месте
-		placeData := map[string]string{
-			"type":             obj.Type,
-			"place_name":       placeName,
-			"addr:city":        tags["addr:city"],
-			"addr:street":      tags["addr:street"],
-			"addr:housenumber": tags["addr:housenumber"],
-			"name":             tags["name"],
-			"amenity":          tags["amenity"],
-			"tourism":          tags["tourism"],
-			"highway":          tags["highway"],
-			"leisure":          tags["leisure"],
-			"building":         tags["building"],
-			"inscription":      tags["inscription"],
-			"description":      tags["description"],
-		}
-		
-		// 4. Добавляем координаты для node
-		if obj.Type == "node" {
-			placeData["lat"] = fmt.Sprintf("%f", obj.Lat)
-			placeData["lon"] = fmt.Sprintf("%f", obj.Lon)
-		}
-		
+
+		// Формируем данные для ProcessPlaces
+		placeData := buildPlaceData(obj)
 		places = append(places, placeData)
 	}
-	
-	// 5. Передаем в ProcessPlaces (предполагаем, что он возвращает результаты)
+
+	// Обрабатываем места
 	results, err := s.ProcessPlacesNoAuth(places)
 	if err != nil {
-		return nil, err
+		return results, err
 	}
-	
-	// 6. Добавляем place_id в успешные результаты
+
+	// Обновляем результаты, добавляя полную информацию о местах
 	for i, result := range results {
+		place := osmObjects[i]
+		placeOutput := buildPlaceOutput(place)
+		// Копируем все поля из placeOutput в result
+		for k, v := range placeOutput {
+			result[k] = v
+		}
+		// Удаляем временное поле details, если оно больше не нужно
+		delete(result, "details")
+		// Добавляем place_id в успешные результаты
 		if status, ok := result["status"].(string); ok && status == "success" {
 			result["place_id"] = fmt.Sprintf("%d", osmObjects[i].ID)
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -647,7 +600,7 @@ func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[st
 			continue
 			//return results, nil //err
 		}
-		
+
 		// Успешный результат
 		results = append(results, map[string]interface{}{
 			"place_name": placeName,
@@ -660,86 +613,41 @@ func (s *PlaceService) ProcessPlacesNoAuth(places []map[string]string) ([]map[st
 	return results, nil
 }
 
-
-
 //  MISTRAL ниже
 
+// ProcessJSONMistral обрабатывает JSON-файл и отправляет места на обработку для Mistral
 func (s *PlaceService) ProcessJSONMistral(osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
-	var places []map[string]string
+	places := make([]map[string]string, 0)
 
+	// Формируем список мест
 	for _, obj := range osmObjects {
-		tags := obj.Tags
-		var placeName string
-
-		// 1. Формируем placeName
-		if name, exists := tags["name"]; exists && name != "" {
-			placeName = name
-		} else if street, exists := tags["addr:street"]; exists && street != "" {
-			if housenumber, exists := tags["addr:housenumber"]; exists && housenumber != "" {
-				placeName = fmt.Sprintf("%s, %s", street, housenumber)
-			} else {
-				placeName = street // Если номера дома нет, используем только улицу
-			}
-		} else {
-			// 2. Дополнительные варианты для placeName
-			switch {
-			case tags["inscription"] != "":
-				placeName = tags["inscription"]
-			case tags["description"] != "":
-				if len(tags["description"]) > 100 { // Ограничиваем длину
-					placeName = tags["description"][:100] + "..."
-				} else {
-					placeName = tags["description"]
-				}
-			case tags["amenity"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["amenity"], obj.ID)
-			case tags["tourism"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["tourism"], obj.ID)
-			case tags["highway"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["highway"], obj.ID)
-			case tags["leisure"] != "":
-				placeName = fmt.Sprintf("%s %d", tags["leisure"], obj.ID)
-			case tags["building"] != "":
-				placeName = fmt.Sprintf("building %d", obj.ID)
-			default:
-				placeName = fmt.Sprintf("%s %d", obj.Type, obj.ID) // Fallback
-			}
+		// Пропускаем пустые места
+		if isPlaceEmpty(obj.Tags) {
+			continue
 		}
 
-		// 3. Собираем данные о месте
-		placeData := map[string]string{
-			"type":             obj.Type,
-			"place_name":       placeName,
-			"addr:city":        tags["addr:city"],
-			"addr:street":      tags["addr:street"],
-			"addr:housenumber": tags["addr:housenumber"],
-			"name":             tags["name"],
-			"amenity":          tags["amenity"],
-			"tourism":          tags["tourism"],
-			"highway":          tags["highway"],
-			"leisure":          tags["leisure"],
-			"building":         tags["building"],
-			"inscription":      tags["inscription"],
-			"description":      tags["description"],
-		}
-
-		// 4. Добавляем координаты для node
-		if obj.Type == "node" {
-			placeData["lat"] = fmt.Sprintf("%f", obj.Lat)
-			placeData["lon"] = fmt.Sprintf("%f", obj.Lon)
-		}
-
+		// Формируем данные для ProcessPlaces
+		placeData := buildPlaceData(obj)
 		places = append(places, placeData)
 	}
 
-	// 5. Передаем в ProcessPlaces (предполагаем, что он возвращает результаты)
+	// Обрабатываем места
 	results, err := s.ProcessPlacesMistral(places)
 	if err != nil {
-		return nil, err
+		return results, err
 	}
 
-	// 6. Добавляем place_id в успешные результаты
+	// Обновляем результаты, добавляя полную информацию о местах
 	for i, result := range results {
+		place := osmObjects[i]
+		placeOutput := buildPlaceOutput(place)
+		// Копируем все поля из placeOutput в result
+		for k, v := range placeOutput {
+			result[k] = v
+		}
+		// Удаляем временное поле details, если оно больше не нужно
+		delete(result, "details")
+		// Добавляем place_id в успешные результаты
 		if status, ok := result["status"].(string); ok && status == "success" {
 			result["place_id"] = fmt.Sprintf("%d", osmObjects[i].ID)
 		}
@@ -751,19 +659,19 @@ func (s *PlaceService) ProcessJSONMistral(osmObjects []dto.OSMObject) ([]map[str
 func (s *PlaceService) ProcessPlacesMistral(places []map[string]string) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	//ctx := context.Background()
-	
+
 	// Заглушка: если массив пустой, возвращаем пустой результат
 	if len(places) == 0 {
 		return results, nil
 	}
-	
+
 	for _, place := range places {
-		
+
 		placeName := place["place_name"]
-		
+
 		// Формируем массив с одним элементом для отправки в LLM
 		placesToProcess := []map[string]string{place}
-		
+
 		// Отправляем запрос в LLM
 		text, err := s.SendBatchToMistral(placesToProcess)
 		if err != nil {
@@ -776,7 +684,7 @@ func (s *PlaceService) ProcessPlacesMistral(places []map[string]string) ([]map[s
 			continue
 			//return results, nil //err
 		}
-		
+
 		// Генерируем аудио
 		audioData, err := s.AudioGenerate(text)
 		if err != nil {
@@ -789,7 +697,7 @@ func (s *PlaceService) ProcessPlacesMistral(places []map[string]string) ([]map[s
 			continue
 			//return results, nil //err
 		}
-		
+
 		// Успешный результат
 		results = append(results, map[string]interface{}{
 			"place_name": placeName,
@@ -798,90 +706,9 @@ func (s *PlaceService) ProcessPlacesMistral(places []map[string]string) ([]map[s
 			"audio":      audioData,
 		})
 	}
-	
+
 	return results, nil
 }
-
-// func (s *PlaceService) SendBatchToMistral(places []map[string]string) (string, error) {
-// 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-// 	defer cancel()
-	
-// 	// Поскольку мы работаем с заглушкой, берём только первый элемент
-// 	if len(places) == 0 {
-// 		return "", fmt.Errorf("массив мест пуст")
-// 	}
-// 	place := places[0]
-	
-// 	// Формируем JSON вручную в формате одиночного объекта
-// 	var jsonBuilder strings.Builder
-// 	jsonBuilder.WriteString("{")
-
-// 	// Поля в точном порядке, как в PlaceData
-// 	fields := []struct {
-// 		key   string
-// 		value string
-// 	}{
-// 		{"addr:city", place["addr:city"]},
-// 		{"addr:street", place["addr:street"]},
-// 		{"addr:housenumber", place["addr:housenumber"]},
-// 		{"name", place["name"]},
-// 		{"amenity", place["amenity"]},
-// 		{"tourism", place["tourism"]},
-// 		{"highway", place["highway"]},
-// 		{"leisure", place["leisure"]},
-// 		{"building", place["building"]},
-// 		{"inscription", place["inscription"]},
-// 		{"description", place["description"]},
-// 	}
-
-// 	for i, field := range fields {
-// 		if i > 0 {
-// 			jsonBuilder.WriteString(",")
-// 		}
-// 		// Экранируем значение для JSON
-// 		escapedValue := strings.ReplaceAll(field.value, `"`, `\"`)
-// 		jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field.key, escapedValue))
-// 	}
-
-// 	jsonBuilder.WriteString("}")
-// 	jsonBody := jsonBuilder.String()
-
-// 	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", os.Getenv("HOST_MISTRAL"), bytes.NewBufferString(jsonBody))
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при создании запроса: %v", err)
-// 	}
-// 	req.Header.Set("Content-Type", "application/json")
-
-// 	client := &http.Client{}
-// 	resp, err := client.Do(req)
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при отправке запроса: %v", err)
-// 	}
-// 	defer resp.Body.Close()
-
-// 	if resp.StatusCode != http.StatusOK {
-// 		return "", fmt.Errorf("ошибка: статус ответа %d", resp.StatusCode)
-// 	}
-
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return "", fmt.Errorf("ошибка при чтении тела ответа: %v", err)
-// 	}
-
-// 	var response struct {
-// 		Text string `json:"message"`
-// 	}
-// 	if err := json.Unmarshal(body, &response); err != nil {
-// 		return "", fmt.Errorf("ошибка парсинга JSON: %v", err)
-// 	}
-
-// 	// Проверяем текст на ошибки
-// 	if err := checkResponseError(response.Text, "LLM"); err != nil {
-// 		return "", err
-// 	}
-
-// 	return response.Text, nil
-// }
 
 func (s *PlaceService) SendBatchToMistral(places []map[string]string) (string, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 300*time.Second)
@@ -965,3 +792,84 @@ func (s *PlaceService) SendBatchToMistral(places []map[string]string) (string, e
 
 	return response.Text, nil
 }
+
+// func (s *PlaceService) SendBatchToMistral(places []map[string]string) (string, error) {
+// 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// 	defer cancel()
+
+// 	// Поскольку мы работаем с заглушкой, берём только первый элемент
+// 	if len(places) == 0 {
+// 		return "", fmt.Errorf("массив мест пуст")
+// 	}
+// 	place := places[0]
+
+// 	// Формируем JSON вручную в формате одиночного объекта
+// 	var jsonBuilder strings.Builder
+// 	jsonBuilder.WriteString("{")
+
+// 	// Поля в точном порядке, как в PlaceData
+// 	fields := []struct {
+// 		key   string
+// 		value string
+// 	}{
+// 		{"addr:city", place["addr:city"]},
+// 		{"addr:street", place["addr:street"]},
+// 		{"addr:housenumber", place["addr:housenumber"]},
+// 		{"name", place["name"]},
+// 		{"amenity", place["amenity"]},
+// 		{"tourism", place["tourism"]},
+// 		{"highway", place["highway"]},
+// 		{"leisure", place["leisure"]},
+// 		{"building", place["building"]},
+// 		{"inscription", place["inscription"]},
+// 		{"description", place["description"]},
+// 	}
+
+// 	for i, field := range fields {
+// 		if i > 0 {
+// 			jsonBuilder.WriteString(",")
+// 		}
+// 		// Экранируем значение для JSON
+// 		escapedValue := strings.ReplaceAll(field.value, `"`, `\"`)
+// 		jsonBuilder.WriteString(fmt.Sprintf(`"%s":"%s"`, field.key, escapedValue))
+// 	}
+
+// 	jsonBuilder.WriteString("}")
+// 	jsonBody := jsonBuilder.String()
+
+// 	req, err := http.NewRequestWithContext(ctxWithTimeout, "POST", os.Getenv("HOST_MISTRAL"), bytes.NewBufferString(jsonBody))
+// 	if err != nil {
+// 		return "", fmt.Errorf("ошибка при создании запроса: %v", err)
+// 	}
+// 	req.Header.Set("Content-Type", "application/json")
+
+// 	client := &http.Client{}
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		return "", fmt.Errorf("ошибка при отправке запроса: %v", err)
+// 	}
+// 	defer resp.Body.Close()
+
+// 	if resp.StatusCode != http.StatusOK {
+// 		return "", fmt.Errorf("ошибка: статус ответа %d", resp.StatusCode)
+// 	}
+
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return "", fmt.Errorf("ошибка при чтении тела ответа: %v", err)
+// 	}
+
+// 	var response struct {
+// 		Text string `json:"message"`
+// 	}
+// 	if err := json.Unmarshal(body, &response); err != nil {
+// 		return "", fmt.Errorf("ошибка парсинга JSON: %v", err)
+// 	}
+
+// 	// Проверяем текст на ошибки
+// 	if err := checkResponseError(response.Text, "LLM"); err != nil {
+// 		return "", err
+// 	}
+
+// 	return response.Text, nil
+// }
