@@ -84,7 +84,7 @@ func main() {
 		protected.GET("/preferences", preferenceController.GetPreferences)
 		protected.DELETE("/preferences/:id", preferenceController.DeletePreference)
 		protected.GET("/users/history", placeController.GetUserHistory)
-		protected.POST("/process-json", placeController.ProcessJSON)
+		// protected.POST("/process-json", placeController.ProcessJSON)
 		protected.POST("/cached-response", placeController.GetCachedResponse)
 	}
 

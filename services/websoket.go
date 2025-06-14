@@ -54,23 +54,24 @@ func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 		h.mu.Unlock()
 	}()
 
-	// Получаем токен из заголовка Authorization
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		log.Printf("Отсутствует заголовок Authorization")
-		conn.WriteJSON(map[string]string{"error": "Authorization header missing"})
+	// Извлекаем токен из параметров URL
+	query := r.URL.Query()
+	token := query.Get("token")
+	if token == "" {
+		log.Printf("Отсутствует токен в параметрах URL")
+		conn.WriteJSON(map[string]string{"error": "Token missing in URL parameters"})
 		return
 	}
 
 	// Извлекаем userID из токена с помощью utils
-	userID, err := utils.ExtractUserIDFromToken(authHeader)
+	userID, err := utils.ExtractUserIDFromToken(token)
 	if err != nil {
 		log.Printf("Ошибка авторизации: %v", err)
 		conn.WriteJSON(map[string]string{"error": "Invalid or expired token"})
 		return
 	}
 
-	//Цикл обработки сообщений
+	// Цикл обработки сообщений
 	for {
 		var osmObjects []dto.OSMObject
 		err := conn.ReadJSON(&osmObjects)
@@ -81,18 +82,21 @@ func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 			break
 		}
 
-		// Обрабатываем данные через PlaceService
-		results, err := h.PlaceService.ProcessJSON(userID, osmObjects)
-		if err != nil {
-			log.Printf("Ошибка обработки: %v", err)
-			conn.WriteJSON(map[string]string{"error": err.Error()})
-			continue
-		}
+		// Канал для получения результатов обработки
+		resultChan := make(chan map[string]interface{})
 
-		// Отправляем результат клиенту
-		if err := conn.WriteJSON(results); err != nil {
-			log.Printf("Ошибка отправки: %v", err)
-			break
+		// Запускаем обработку в отдельной горутине
+		go func() {
+			defer close(resultChan)
+			h.PlaceService.StreamProcessJSON(userID, osmObjects, resultChan)
+		}()
+
+		// Отправляем результаты по мере их поступления
+		for result := range resultChan {
+			if err := conn.WriteJSON(result); err != nil {
+				log.Printf("Ошибка отправки результата: %v", err)
+				break
+			}
 		}
 	}
 }

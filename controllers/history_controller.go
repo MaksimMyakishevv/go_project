@@ -83,34 +83,34 @@ func (c *PlaceController) GenerateAudioFromText(ctx *gin.Context) {
 // @Failure      400    {object}  PlaceErrorResponse
 // @Failure      500    {object}  PlaceErrorResponse
 // @Router       /process-json [post]
-func (c *PlaceController) ProcessJSON(ctx *gin.Context) {
-	var input dto.ProcessPlacesDTO
-	// Проверяем и парсим тело запроса
-	if err := ctx.ShouldBindJSON(&input); err != nil {
-		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
-		return
-	}
-	// Извлекаем userID из контекста
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		ctx.JSON(http.StatusUnauthorized, PlaceErrorResponse{Error: "User not authenticated"})
-		return
-	}
-	// Преобразуем userID в тип uint
-	userIDUint, ok := userID.(uint)
-	if !ok {
-		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Failed to parse userID"})
-		return
-	}
-	// Вызываем сервис для обработки JSON-файла
-	results, err := c.Service.ProcessJSON(userIDUint, input.JSONData)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
-		return
-	}
-	// Возвращаем результаты
-	ctx.JSON(http.StatusOK, results)
-}
+// func (c *PlaceController) ProcessJSON(ctx *gin.Context) {
+// 	var input dto.ProcessPlacesDTO
+// 	// Проверяем и парсим тело запроса
+// 	if err := ctx.ShouldBindJSON(&input); err != nil {
+// 		ctx.JSON(http.StatusBadRequest, PlaceErrorResponse{Error: err.Error()})
+// 		return
+// 	}
+// 	// Извлекаем userID из контекста
+// 	userID, exists := ctx.Get("userID")
+// 	if !exists {
+// 		ctx.JSON(http.StatusUnauthorized, PlaceErrorResponse{Error: "User not authenticated"})
+// 		return
+// 	}
+// 	// Преобразуем userID в тип uint
+// 	userIDUint, ok := userID.(uint)
+// 	if !ok {
+// 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: "Failed to parse userID"})
+// 		return
+// 	}
+// 	// Вызываем сервис для обработки JSON-файла
+// 	results, err := c.Service.ProcessJSON(userIDUint, input.JSONData)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, PlaceErrorResponse{Error: err.Error()})
+// 		return
+// 	}
+// 	// Возвращаем результаты
+// 	ctx.JSON(http.StatusOK, results)
+// }
 
 // GetCachedResponse godoc
 // @Summary      Получить закешированный ответ

@@ -73,7 +73,7 @@ func (s *PlaceService) GetCachedResponse(userID uint, placeName string) (string,
 
 // SendBatchToLLM отправляет данные одного места в LLM в формате одиночного объекта JSON
 func (s *PlaceService) SendBatchToLLM(places []map[string]string) (string, error) {
-	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 9999*time.Second)
 	defer cancel()
 
 	if len(places) == 0 {
@@ -162,7 +162,7 @@ func (s *PlaceService) AudioGenerate(text string) ([]byte, error) {
 		return nil, fmt.Errorf("ошибка при маршалинге JSON: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 9999*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", os.Getenv("HOST_TTS"), bytes.NewBuffer(jsonBody))
@@ -295,21 +295,17 @@ func (s *PlaceService) ProcessPlaces(userID uint, places []map[string]string) ([
 }
 
 // ProcessPlacesGoroutines обрабатывает массив мест параллельно с оптимизацией
-func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]string) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]string, resultChan chan<- map[string]interface{}) {
 	ctx := context.Background()
-	var mu sync.Mutex
 	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 1) // Ограничиваем до 5 параллельных запросов
 
 	if len(places) == 0 {
-		return results, nil
+		return
 	}
 
-	results = make([]map[string]interface{}, len(places))
-	semaphore := make(chan struct{}, 5) // Ограничиваем до 5 параллельных запросов
-
 	// Обрабатываем каждое место
-	for i, place := range places {
+	for _, place := range places {
 		placeName := place["place_name"]
 		cacheKey := fmt.Sprintf("llm:user:%d:place:%s", userID, placeName)
 
@@ -325,14 +321,14 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 			placeResult["response"] = cachedResponse
 			placeResult["audio"] = nil
 			placeResult["status"] = "success"
-			results[i] = placeResult
+			resultChan <- placeResult
 			continue
 		}
 
 		// Если нет в кеше, обрабатываем в горутине
 		wg.Add(1)
 		semaphore <- struct{}{} // Захватываем слот в семафоре
-		go func(idx int, place map[string]string) {
+		go func(place map[string]string) {
 			defer wg.Done()
 			defer func() { <-semaphore }() // Освобождаем слот
 
@@ -350,9 +346,7 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 				placeResult["response"] = fmt.Sprintf("Ошибка LLM: %v", llmErr)
 				placeResult["audio"] = nil
 				placeResult["status"] = "llm_error"
-				mu.Lock()
-				results[idx] = placeResult
-				mu.Unlock()
+				resultChan <- placeResult
 				return
 			}
 
@@ -361,9 +355,7 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 				placeResult["response"] = text
 				placeResult["audio"] = fmt.Sprintf("Ошибка TTS: %v", ttsErr)
 				placeResult["status"] = "tts_error"
-				mu.Lock()
-				results[idx] = placeResult
-				mu.Unlock()
+				resultChan <- placeResult
 				return
 			}
 
@@ -378,23 +370,18 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 				placeResult["response"] = text
 				placeResult["audio"] = audioData
 				placeResult["status"] = "failed_to_add"
-				mu.Lock()
-				results[idx] = placeResult
-				mu.Unlock()
+				resultChan <- placeResult
 				return
 			}
 
 			placeResult["response"] = text
 			placeResult["audio"] = audioData
 			placeResult["status"] = "success"
-			mu.Lock()
-			results[idx] = placeResult
-			mu.Unlock()
-		}(i, place)
+			resultChan <- placeResult
+		}(place)
 	}
 
 	wg.Wait()
-	return results, nil
 }
 
 // findResultByPlaceName проверяет, есть ли результат для placeName
@@ -408,41 +395,41 @@ func findResultByPlaceName(results []map[string]interface{}, placeName string) (
 }
 
 // ProcessJSON обрабатывает JSON-файл и отправляет места на обработку
-func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
-	places := make([]map[string]string, 0)
+// func (s *PlaceService) ProcessJSON(userID uint, osmObjects []dto.OSMObject) ([]map[string]interface{}, error) {
+// 	places := make([]map[string]string, 0)
 
-	// Формируем список мест
-	for _, obj := range osmObjects {
-		// Пропускаем пустые места
-		if isPlaceEmpty(obj.Tags) {
-			continue
-		}
+// 	// Формируем список мест
+// 	for _, obj := range osmObjects {
+// 		// Пропускаем пустые места
+// 		if isPlaceEmpty(obj.Tags) {
+// 			continue
+// 		}
 
-		// Формируем данные для ProcessPlaces
-		placeData := buildPlaceData(obj)
-		places = append(places, placeData)
-	}
+// 		// Формируем данные для ProcessPlaces
+// 		placeData := buildPlaceData(obj)
+// 		places = append(places, placeData)
+// 	}
 
-	// Обрабатываем места
-	results, err := s.ProcessPlacesGoroutines(userID, places)
-	if err != nil {
-		return results, err
-	}
+// 	// Обрабатываем места
+// 	results, err := s.ProcessPlacesGoroutines(userID, places)
+// 	if err != nil {
+// 		return results, err
+// 	}
 
-	// Обновляем результаты, добавляя полную информацию о местах
-	for i, result := range results {
-		place := osmObjects[i]
-		placeOutput := buildPlaceOutput(place)
-		// Копируем все поля из placeOutput в result
-		for k, v := range placeOutput {
-			result[k] = v
-		}
-		// Удаляем временное поле details, если оно больше не нужно
-		delete(result, "details")
-	}
+// 	// Обновляем результаты, добавляя полную информацию о местах
+// 	for i, result := range results {
+// 		place := osmObjects[i]
+// 		placeOutput := buildPlaceOutput(place)
+// 		// Копируем все поля из placeOutput в result
+// 		for k, v := range placeOutput {
+// 			result[k] = v
+// 		}
+// 		// Удаляем временное поле details, если оно больше не нужно
+// 		delete(result, "details")
+// 	}
 
-	return results, nil
-}
+// 	return results, nil
+// }
 
 // buildPlaceName формирует название места
 func buildPlaceName(tags map[string]string, objType string, objID int64) string {
@@ -510,6 +497,26 @@ func buildPlaceOutput(obj dto.OSMObject) map[string]interface{} {
 	}
 
 	return placeData
+}
+
+// StreamProcessJSON обрабатывает JSON-файл и отправляет результаты в канал по мере готовности
+func (s *PlaceService) StreamProcessJSON(userID uint, osmObjects []dto.OSMObject, resultChan chan<- map[string]interface{}) {
+	places := make([]map[string]string, 0)
+
+	// Формируем список мест
+	for _, obj := range osmObjects {
+		// Пропускаем пустые места
+		if isPlaceEmpty(obj.Tags) {
+			continue
+		}
+
+		// Формируем данные для ProcessPlaces
+		placeData := buildPlaceData(obj)
+		places = append(places, placeData)
+	}
+
+	// Обрабатываем места и отправляем результаты в канал
+	s.ProcessPlacesGoroutines(userID, places, resultChan)
 }
 
 //
