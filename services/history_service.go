@@ -319,7 +319,8 @@ func (s *PlaceService) ProcessPlacesGoroutines(userID uint, places []map[string]
 		// Проверяем кеш заранее
 		if cachedResponse, err := database.RedisClient.Get(ctx, cacheKey).Result(); err == nil {
 			placeResult["response"] = cachedResponse
-			placeResult["audio"] = nil
+			audioData, _ := s.AudioGenerate(cachedResponse)
+			placeResult["audio"] = audioData
 			placeResult["status"] = "success"
 			resultChan <- placeResult
 			continue
